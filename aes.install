@@ -1,0 +1,44 @@
+<?php
+// $Id$
+
+function aes_install() {
+  
+  /*
+  Creating an initialization vector. If you ever need to migrate your system or load in a backup, make sure you still have this, along with the key of course. You need both to be able to unlock your passwords.
+  */
+  $iv = variable_get("aes_encryption_iv", null);
+  if (empty($iv)) {
+    $td = mcrypt_module_open(MCRYPT_RIJNDAEL_128, "", MCRYPT_MODE_CBC, "");
+    $iv = mcrypt_create_iv(mcrypt_enc_get_iv_size($td), MCRYPT_DEV_URANDOM);
+    mcrypt_module_close($td);
+    variable_set("aes_encryption_iv", base64_encode($iv));
+    drupal_set_message(t("New initialization vector created for the AES module."));
+  }
+  else {
+    drupal_set_message(t("An old initialization vector was found for the AES module. Not creating a new one to avoid overwriting the existing one."));
+  }
+
+  variable_set("aes_convert", "false");
+  variable_set("aes_key_storage_method", "database");
+  
+}
+
+/*
+At uninstall we remake all the AES strings into MD5 hashes.
+*/
+function aes_uninstall() {
+  //delete keyfile
+  if (variable_get("aes_key_storage_method", "") == "File") {
+    unlink(variable_get("aes_key_path", ""));
+  }
+  
+  //delete variables
+  variable_del("aes_convert");
+  variable_del("aes_key_storage_method");
+  variable_del("aes_key_path");
+  variable_del("aes_key");
+  variable_del("aes_encryption_iv");
+  
+  drupal_set_message("AES uninstalled.");
+}
+

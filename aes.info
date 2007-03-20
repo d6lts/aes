@@ -1,0 +1,4 @@
+; $Id$
+name = AES
+description = "Provides AES encryption."
+version = "$Name$"
