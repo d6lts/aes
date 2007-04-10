@@ -1,0 +1,8 @@
+; $Id $
+1.0 -> 1.1
+ * Added option to use 192 or 256 bit versions of the Rijndael algorithms.
+ * Drupals database abstraction layer is now used properly.
+ * Added (untested) support for Windows.
+ * AES-encrypted passwords are now stored separately in their own table instead of replacing the MD5 passwords in the users table.
+ * Added option to show the decrypted password on another page.
+ * Plus some other minor changes.
