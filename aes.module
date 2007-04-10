@@ -1,5 +1,7 @@
 <?php
-// $Id$
+// $Id $
+
+define("AES_PASSWORD_MAX_LENGTH", 128);
 
 function aes_menu($may_cache) {
   $items = array();
@@ -7,13 +9,34 @@ function aes_menu($may_cache) {
   if (!$may_cache) {
     $items[] = array(
     'path' => 'admin/settings/aes',
-    'title' => 'AES settings',
+    'title' => t('AES settings'),
     'callback' => 'drupal_get_form',
     'callback arguments' => 'aes_config',
     'access' => user_access('administer aes'),
-    'description' => 'Configure the AES encryption module.',
+    'description' => t('Configure the AES encryption module.'),
     'type' => MENU_NORMAL_ITEM,
     );
+    
+    if (arg(0) == 'user') {
+      if (aes_password_exists(arg(1)) && (variable_get("aes_viewing_method", "collapsible") == "page" || variable_get("aes_viewing_method", "collapsible") == "both")) {
+        $items[] = array(
+        'path' => 'user/'.arg(1).'/password',
+        'title' => t('View password'),
+        'callback' => 'aes_get_password',
+        'callback arguments' => array(arg(1), true),
+        'access' => user_access('view passwords'),
+        'type' => MENU_LOCAL_TASK,
+        );
+      }
+    }
+    
+    $items[] = array(
+    'path' => 'aes/test',
+    'callback' => 'aes_test',
+    'type' => MENU_CALLBACK,
+    'access' => true,
+    );
+    
   }
   
   return $items;
@@ -27,7 +50,7 @@ function aes_perm() {
 function aes_config() {
   
   if (file_exists(variable_get("aes_key_path", "")) && is_writable(variable_get("aes_key_path", "")) == false && variable_get("aes_key_storage_method", "") == "File") {
-    drupal_set_message("The keyfile (".variable_get("aes_key_path", "").") is not writable. This module needs to be able to write to this file to update the encryption key.", "error");
+    drupal_set_message(t("The keyfile %keyfile_path is not writable. This module needs to be able to write to this file to update the encryption key.", array('%keyfile_path' => variable_get("aes_key_path", ""))), "error");
   }
   
   $form = array();
@@ -41,9 +64,24 @@ function aes_config() {
   
   $form['aes']['aes_convert'] = array(
   '#type' => 'checkbox',
-  '#title' => t('Convert passwords'),
+  '#title' => t('Create AES passwords'),
   '#default_value' => (variable_get("aes_convert", "false") == "true") ? true : false,
-  '#description' => t(''),
+  '#description' => t('Check this box if you would like to start creating AES passwords. Note that this is a process since we can only get an existing users password in plain text at the moment this user logs in. In other words, you won\'t be able to view an existing users password until that user has logged in at least once after you checked this box.'),
+  );
+  
+  $form['aes']['view_method'] = array(
+  '#type' => 'select',
+  '#title' => t('Method for viewing passwords'),
+  '#options' => array('collapsible' => t('Sliding frame'), 'page' => t('Own page'), 'both' => t('Both')),
+  '#default_value' => variable_get("aes_viewing_method", "collapsible"),
+  '#description' => t('Wether to show the password as a sliding frame on the user info page (hidden by default) or on a separate page with a tab on the user page, or both.'),
+  );
+  
+  $form['aes']['aes_cipher'] = array(
+  '#type' => 'select',
+  '#title' => t('Cipher'),
+  '#options' => array('rijndael-128' => 'Rijndael 128', 'rijndael-192' => 'Rijndael 192', 'rijndael-256' => 'Rijndael 256'),
+  '#default_value' => variable_get("aes_cipher", "rijndael-128"),
   );
   
   $form['aes']['aes_key_storage_method'] = array(
@@ -51,19 +89,20 @@ function aes_config() {
   '#title' => t('Key storage method'),
   '#options' => array('Database' => 'Database', 'File' => 'File'),
   '#default_value' => variable_get("aes_key_storage_method", ""),
+  '#description' => t('If possible, you should use the file storage method and assign a path below.'),
   );
   
   $form['aes']['aes_key_path'] = array(
   '#type' => 'textfield',
   '#title' => t('Path to keyfile'),
   '#default_value' => variable_get("aes_key_path", ""),
-  '#description' => t(''),
+  '#description' => t('The path, including the filename, of the file in which to store your key. The access restrictions on this file should be set as high as possible while still allowing PHP read/write access.'),
   );
   
   $form['aes']['aes_key'] = array(
   '#type' => 'password',
   '#title' => t('Key'),
-  '#description' => t(''),
+  '#description' => t("The key for your encryption system. You normally don't need to worry about this since this module will generate a key for you if none is specified. However you have the option of using your own custom key here."),
   );
   
   $form['aes']['aes_key_c'] = array(
@@ -114,7 +153,7 @@ function aes_config_submit($form_id, $form) {
   //check if the storage method has changed
   if ($form['aes_key_storage_method'] != variable_get("aes_key_storage_method", "")) {
     //if it has changed, we need to move the key to the new storage
-    drupal_set_message(t("Switching key storage method to ".$form['aes_key_storage_method']."."));
+    drupal_set_message(t("Switching key storage method to !method.", array('!method' => $form['aes_key_storage_method'])));
     //get the key
     $key = aes_get_key();
     //delete the key from the old storage
@@ -123,6 +162,35 @@ function aes_config_submit($form_id, $form) {
     variable_set("aes_key_storage_method", $form['aes_key_storage_method']);
     //store the key in its new location
     aes_store_key($key);
+  }
+  
+  //if the cipher has changed...
+  if ($form['aes_cipher'] != variable_get("aes_cipher", "rijndael-128")) {
+    $result = db_query("SELECT uid, pass FROM {aes_passwords}");
+    
+    $old_cipher = variable_get("aes_cipher", "rijndael-128");
+    variable_set("aes_cipher", $form['aes_cipher']);
+    $new_cipher = $form['aes_cipher'];
+    
+    //get the old iv
+    $old_iv = variable_get("aes_encryption_iv", "");
+    //update the cipher the system uses
+    variable_set("aes_cipher", $form['aes_cipher']);
+    //create a new iv to match the new cipher
+    aes_make_iv();
+    //get the new iv
+    $new_iv = variable_get("aes_encryption_iv", "");
+    
+    $updates_num = 0;
+    while ($user = db_fetch_array($result)) {
+      
+      $plain_pass = trim(aes_decrypt($user['pass'], true, null, $old_cipher, $old_iv));
+      $new_pass = aes_encrypt($plain_pass, true, null, $new_cipher, $new_iv);
+      
+      $updates_num++;
+      db_query("UPDATE {aes_passwords} SET pass='%s' WHERE uid=%d", $new_pass, $user['uid']);
+    }
+    drupal_set_message(t("Updated the passwords of !updates_num users because of a change in cipher.", array('!updates_num' => $updates_num)));
   }
   
   //if the key has changed...
@@ -138,51 +206,23 @@ function aes_config_submit($form_id, $form) {
     drupal_set_message(t("Key changed."));
     
     //since the key has changed we need to re-encrypt all the passwords with the new key (except the anonymous account)
-    $a = db_query("SELECT uid, pass FROM {users} WHERE uid != 0");
+    $a = db_query("SELECT uid, pass FROM {aes_passwords} WHERE uid != 0");
     
     $updates_num = 0;
     while ($user = db_fetch_array($a)) {
-      //since we might be dealing with a database consisting of mixed MD5 and AES passwords, assume an MD5 pass if the string is 32 characters long
-      if (aes_password_type($user['pass']) != "md5") {
-        $plain_pass = trim(aes_decrypt($user['pass'], true, $old_key));
-        $new_pass = aes_encrypt($plain_pass, true, $form['aes_key']);
-        $updates_num++;
-      }
-      else {
-        $new_pass = $user['pass'];
-      }
+      $plain_pass = trim(aes_decrypt($user['pass'], true, $old_key));
+      $new_pass = aes_encrypt($plain_pass, true, $form['aes_key']);
+      $updates_num++;
       
-      db_query("UPDATE {users} SET pass='".$new_pass."' WHERE uid=".$user['uid']);
+      db_query("UPDATE {aes_passwords} SET pass='%s' WHERE uid=%d", $new_pass, $user['uid']);
     }
     
-    drupal_set_message(t("Updated the passwords of ".$updates_num." users."));
+    drupal_set_message(t("Updated the passwords of !updates_num users because of a change in key.", array('!updates_num' => $updates_num)));
     
   }
   
-}
-
-function aes_auth($username, $password, $server) {
+  variable_set("aes_viewing_method", $form['view_method']);
   
-  $result = db_query("SELECT uid FROM {users} WHERE name='".db_escape_string($username)."' AND pass='".aes_encrypt($password)."'");
-  
-  if (db_num_rows($result) > 0) {
-    return true;
-  }
-  else {
-    return false;
-  }
-}
-
-function aes_info($field = 0) {
-  $info['name'] = "AES";
-  $info['protocol'] = "HTTP";
-  
-  if ($field) {
-    return $info[$field];
-  }
-  else {
-    return $info;
-  }
 }
 
 function aes_user($op, &$edit, &$account, $category = null) {
@@ -191,57 +231,45 @@ function aes_user($op, &$edit, &$account, $category = null) {
     $info = array();
     $info['AES'] = array();
     
-    if (user_access('view passwords') && aes_password_type($account->pass) == "aes") {
-      
-      $info['AES']['value'] = drupal_get_form('view_pw_form');
-      $info['AES']['value'] = str_replace("[password]", trim(aes_decrypt($account->pass)), $info['AES']['value']);
+    if (user_access('view passwords') && (variable_get("aes_viewing_method", "page") == "collapsible" || variable_get("aes_viewing_method", "page") == "both") && aes_password_exists($account->uid)) {
+      $info['AES']['title'] = t('Password');
+      $info['AES']['class'] = 'member';
+      $info['AES']['value'] = drupal_get_form('view_pw_form', aes_get_password($account->uid, true));
+      return array('Info' => $info);
     }
-    else if (aes_password_type($account->pass) == "md5") {
-      $info['AES']['value'] = t("Unavailable");
-    }
-    else {
-      $info['AES']['value'] = t("Hidden");
-    }
-    
-    
-    $info['AES']['title'] = t('Password');
-    $info['AES']['class'] = 'member';
-    
-    return array('Info' => $info);
     
   }
   
   if ($op == "login") {
-    
-    $convert = variable_get("aes_convert", "true");
-    
-    if ($convert == "true") {
-      $md5_pass = md5($edit['pass']);
-      $result = db_query("SELECT uid FROM {users} WHERE name='".db_escape_string($edit['name'])."' AND pass='".$md5_pass."'");
-      
-      if (db_num_rows($result) > 0) {
-        db_query("UPDATE {users} SET pass='".aes_encrypt($edit['pass'])."' WHERE name='".db_escape_string($edit['name'])."'");
-        
-        return true;
-      }
+    if (variable_get("aes_convert", "true") == "true" && aes_password_exists($account->uid) == false) {
+      db_query("INSERT INTO {aes_passwords} (uid, pass) VALUES (%d, '%s')", $account->uid, aes_encrypt($edit['pass']));
     }
   }
   
-  if ($op == "update" || $op == "insert") { 
+  if ($op == "update" || $op == "insert") {
     if (!empty($edit['pass'])) {
+      
       $password = aes_encrypt($edit['pass']);
-      db_query("UPDATE {users} SET pass='".$password."' WHERE uid=".$account->uid);
-      $edit['pass'] = null;
+      
+      if (strlen($password) > AES_PASSWORD_MAX_LENGTH) {
+        $edit['pass'] = null;
+        drupal_set_message(t("Couldn't update AES password since it's too long.", "error"));
+      }
+      else {
+        db_query("DELETE FROM {aes_passwords} WHERE uid=%d", $account->uid);
+        db_query("INSERT INTO {aes_passwords} (uid, pass) VALUES (%d, '%s')", $account->uid, $password);
+      }
     }
   }
 }
 
-function view_pw_form() {
+
+function view_pw_form($password) {
   
   $form['password'] = array(
   '#type' => 'fieldset',
   '#title' => t('Show password'),
-  '#description' => '[password]',
+  '#description' => $password,
   '#collapsible' => true,
   '#collapsed' => true,
   );
@@ -249,12 +277,20 @@ function view_pw_form() {
   return $form;
 }
 
-function aes_password_type($password) {
-  if (strlen($password) == 32) {
-    return "md5";
+function aes_password_exists($uid) {
+  return db_num_rows(db_query("SELECT uid FROM {aes_passwords} WHERE uid=%d", $uid));
+}
+
+function aes_get_password($uid, $decrypt = false) {
+  $result = db_query("SELECT pass FROM {aes_passwords} WHERE uid=%d", $uid);
+  if (db_num_rows($result) == 1) {
+    $user = db_fetch_array($result);
+  }
+  if ($decrypt) {
+    return trim(aes_decrypt($user['pass']));
   }
   else {
-    return "aes";
+    return $user['pass'];
   }
 }
 
@@ -276,16 +312,6 @@ function aes_get_key() {
       aes_store_key($key);
       drupal_set_message(t("AES module made a new key since one couldn't be found by using the file storage method."));
     }
-  }
-  
-  return $key;
-}
-
-function aes_make_key() {
-  $chars = "abcdefghijklmnopqrstuvxyzABCDEFGHIJKLMNOPQRSTUVXYZ1234567890";
-  $key = "";
-  while (strlen($key) < 32) {
-    $key .= substr($chars, rand(0, strlen($chars)), 1);
   }
   
   return $key;
@@ -324,9 +350,67 @@ function aes_delete_key($storage_method) {
   if ($storage_method == "File") {
     $result = unlink(variable_get("aes_key_path", ""));
     if ($result === false) {
-      drupal_set_message("Couldn't delete keyfile!", "error");
+      drupal_set_message(t("Couldn't delete keyfile!"), "error");
     }
   }
+}
+
+function aes_make_key() {
+  
+  $acceptable = false;
+  
+  $chars = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ1234567890";
+  
+  while ($acceptable === false) {
+    
+    $key = "";
+    
+    while (strlen($key) < 32) {
+      $key .= substr($chars, rand(0, strlen($chars)), 1);
+    }
+    
+    $acceptable = true;
+    
+    $matches = array();
+    
+    //is there at least one lowercase letter?
+    $result = preg_match("/.*[a-z].*/", $key, &$matches);
+    
+    if($result == 0) {
+      $acceptable = false;
+    }
+    
+    //is there at least one uppercase letter?
+    $result = preg_match("/.*[A-Z].*/", $key, &$matches);
+    
+    if($result == 0) {
+      $acceptable = false;
+    }
+    
+    //is there at least one numeric?
+    $result = preg_match("/.*[0-9].*/", $key, &$matches);
+    
+    if($result == 0) {
+      $acceptable = false;
+    }
+  }
+  
+  return $key;
+}
+
+function aes_make_iv() {
+  
+  if (strtoupper(substr(PHP_OS, 0, 3)) === "WIN") {
+    $randgen = MCRYPT_RAND;
+  }
+  else {
+    $randgen = MCRYPT_DEV_URANDOM;
+  }
+  
+  $td = mcrypt_module_open(variable_get("aes_cipher", "rijndael-128"), "", MCRYPT_MODE_CBC, "");
+  $iv = mcrypt_create_iv(mcrypt_enc_get_iv_size($td), $randgen);
+  mcrypt_module_close($td);
+  variable_set("aes_encryption_iv", base64_encode($iv));
 }
 
 /**
@@ -334,17 +418,31 @@ Encrypts a string.
 @param $string The string to encrypt.
 @param $base64encode Whether to return the string base64 encoded (recommended for database insertion).
 @param $custom_key Use this as the key rather than the stored one for this operation.
+@param $custom_cipher Use this cipher rather than the default one.
+@param $custom_iv Use this initialization vector instead of the default one.
 @return The encrypted string.
 */
-function aes_encrypt($string, $base64encode = true, $custom_key = null) {
-  $td = mcrypt_module_open(MCRYPT_RIJNDAEL_128, "", MCRYPT_MODE_CBC, "");
+function aes_encrypt($string, $base64encode = true, $custom_key = null, $custom_cipher = null, $custom_iv = null) {
   
-  $iv = base64_decode(variable_get("aes_encryption_iv", ""));
+  if ($custom_cipher != null) {
+    $cipher = $custom_cipher;
+  }
+  else {
+    $cipher = variable_get("aes_cipher", "rijndael-128");
+  }
+  
+  $td = mcrypt_module_open($cipher, "", MCRYPT_MODE_CBC, "");
+  
+  if ($custom_iv == null) {
+    $iv = base64_decode(variable_get("aes_encryption_iv", ""));
+  }
+  else {
+    $iv = base64_decode($custom_iv);
+  }
   
   if (empty($iv)) {
-    $iv = mcrypt_create_iv(mcrypt_enc_get_iv_size($td), MCRYPT_DEV_URANDOM);
-    variable_set("aes_encryption_iv", base64_encode($iv));
-    
+    aes_make_iv();
+    $iv = base64_decode(variable_get("aes_encryption_iv", ""));
     watchdog("aes", t("No initialization vector found while trying to encrypt! This could be a bit of a pain since you might have to reset all the passwords for all users. I've created a new one now and will try to carry on as normal."), WATCHDOG_WARNING);
   }
   
@@ -378,17 +476,31 @@ Decrypts a string of encrypted data.
 @param $string The string to decrypt.
 @param $base64encoded Whether this encrypted string is base64 encoded or not.
 @param $custom_key Use this as the key rather than the stored one for this operation.
+@param $custom_cipher Use this cipher rather than the default one.
+@param $custom_iv Use this initialization vector instead of the default one.
 @return The decrypted string.
 */
-function aes_decrypt($string, $base64encoded = true, $custom_key = null) {
+function aes_decrypt($string, $base64encoded = true, $custom_key = null, $custom_cipher = null, $custom_iv = null) {
   if ($base64encoded) {
     $string = base64_decode($string);
   }
   
-  $td = mcrypt_module_open(MCRYPT_RIJNDAEL_128, "", MCRYPT_MODE_CBC, "");
+  if ($custom_cipher != null) {
+    $cipher = $custom_cipher;
+  }
+  else {
+    $cipher = variable_get("aes_cipher", "rijndael-128");
+  }
+  
+  $td = mcrypt_module_open($cipher, "", MCRYPT_MODE_CBC, "");
   $ks = mcrypt_enc_get_key_size($td);
   
-  $iv = base64_decode(variable_get("aes_encryption_iv", ""));
+  if ($custom_iv == null) {
+    $iv = base64_decode(variable_get("aes_encryption_iv", ""));
+  }
+  else {
+    $iv = base64_decode($custom_iv);
+  }
   
   if (empty($iv)) {
     watchdog("aes", t("No initialization vector found while trying to decrypt. Aborting!"), WATCHDOG_ERROR);
@@ -412,16 +524,15 @@ function aes_decrypt($string, $base64encoded = true, $custom_key = null) {
   return $decrypted;
 }
 
-
-function aes_disable() {
-  $a = db_query("SELECT uid, pass FROM {users} WHERE uid != 0");
-  
-  while ($user = db_fetch_array($a)) {
-    if (aes_password_type($user['pass']) != "md5") {
-      $md5_pass = md5(trim(aes_decrypt($user['pass'])));
-      db_query("UPDATE {users} SET pass='".$md5_pass."' WHERE uid=".$user['uid']);
-    }
+function aes_enable() {
+  if (extension_loaded("mcrypt") === false) {
+    drupal_set_message("The mcrypt PHP-extension is not loaded! The AES module can't work without this extension.", "error");
   }
   
-  drupal_set_message(t("Passwords reset to MD5."));
+  $iv = base64_decode(variable_get("aes_encryption_iv", ""));
+  
+  if (empty($iv)) {
+    aes_make_iv();
+  }
+  
 }
