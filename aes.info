@@ -1,4 +1,3 @@
 ; $Id$
 name = AES
 description = "Provides AES encryption."
-version = "5.x-1.0"
