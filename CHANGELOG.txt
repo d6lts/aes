@@ -1,0 +1,16 @@
+; $Id $
+
+1.1 -> 1.2
+ * Fixed a faulty use of preg_match which caused a warning in PHP 5.2.x.
+ * A users encrypted password is now deleted along with the user.
+ * Removed a redundant write to file when saving a key using the file storage method.
+ * Fixed the anonymous account receiving an encrypted password in some situations.
+ * Removed an unused menu item.
+
+1.0 -> 1.1
+ * Added option to use 192 or 256 bit versions of the Rijndael algorithms.
+ * Drupals database abstraction layer is now used properly.
+ * Added (untested) support for Windows.
+ * AES-encrypted passwords are now stored separately in their own table instead of replacing the MD5 passwords in the users table.
+ * Added option to show the decrypted password on another page.
+ * Plus some other minor changes.
