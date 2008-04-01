@@ -3,21 +3,7 @@
 
 function aes_install() {
   
-  if ($GLOBALS['db_type'] == "mysql" || $GLOBALS['db_type'] == "mysqli") {
-    db_query("CREATE TABLE `{aes_passwords}` (
-    `uid` INT NOT NULL ,
-    `pass` VARCHAR( 128 ) NOT NULL ,
-    PRIMARY KEY ( `uid` )
-    )");
-  }
-  else if ($GLOBALS['db_type'] == "pgsql") {
-    db_query("CREATE TABLE {aes_passwords} (
-    uid integer NOT NULL,
-    pass character varying(128)
-    )");
-    
-    db_query("ALTER TABLE ONLY {aes_passwords} ADD CONSTRAINT {aes_passwords}_pkey PRIMARY KEY (uid)");
-  }
+  drupal_install_schema("aes");
   
   variable_set("aes_key_storage_method", "Database");
   variable_set("aes_cipher", "rijndael-128");
@@ -27,13 +13,26 @@ function aes_install() {
   drupal_set_message(t("AES installed."));
 }
 
+function aes_schema() {
+	
+	$schema['aes_passwords'] = array(
+		'fields' => array(
+			'uid' => array('type' => 'int', 'unsigned' => true, 'not null' => true, 'default' => 0),
+			'pass' => array('type' => 'varchar', 'length' => 128, 'not null' => true, 'default' => ''),
+			),
+		'primary key' => array('uid'),
+	);
+	
+	return $schema;
+}
+
 function aes_uninstall() {
   //delete keyfile
   if (variable_get("aes_key_storage_method", "") == "File") {
     unlink(variable_get("aes_key_path", ""));
   }
   
-  db_query("DROP TABLE {aes_passwords}");
+  drupal_uninstall_schema("aes");
   
   //delete variables
   variable_del("aes_key");
@@ -47,58 +46,3 @@ function aes_uninstall() {
   
   drupal_set_message(t("AES uninstalled."));
 }
-
-function aes_update_1() {
-  if ($GLOBALS['db_type'] == "mysql" || $GLOBALS['db_type'] == "mysqli") {
-    $return[] = update_sql("CREATE TABLE `{aes_passwords}` (
-    `uid` INT NOT NULL ,
-    `pass` VARCHAR( 128 ) NOT NULL ,
-    PRIMARY KEY ( `uid` )
-    )");
-  }
-  else if ($GLOBALS['db_type'] == "pgsql") {
-    $return[] = update_sql("CREATE TABLE {aes_passwords} (
-    uid integer NOT NULL,
-    pass character varying(128)
-    )");
-    
-    $return[] = update_sql("ALTER TABLE ONLY {aes_passwords} ADD CONSTRAINT {aes_passwords}_pkey PRIMARY KEY (uid)");
-  }
-  
-  $result = db_query("SELECT uid, pass FROM {users} WHERE uid != 0");
-  
-  while ($user = db_fetch_array($result)) {
-    if (strlen($user['pass']) != 32) {
-      
-      $td = mcrypt_module_open("rijndael-128", "", MCRYPT_MODE_CBC, "");
-      $iv = base64_decode(variable_get("aes_encryption_iv", ""));
-      $ks = mcrypt_enc_get_key_size($td);
-      
-      $storage_method = variable_get("aes_key_storage_method", "database");
-      if ($storage_method == "Database") {
-        $key = variable_get("aes_key", false);
-      }
-      if ($storage_method == "File") {
-        $key = file_get_contents(variable_get("aes_key_path", ""));
-      }
-      
-      $key = substr(sha1($key), 0, $ks);
-  
-      mcrypt_generic_init($td, $key, $iv);
-      $plain_pass = mdecrypt_generic($td, base64_decode($user['pass']));
-      mcrypt_generic_deinit($td);
-      mcrypt_module_close($td);
-      
-      $md5_pass = md5(trim($plain_pass));
-      db_query("INSERT INTO {aes_passwords} (uid, pass) VALUES (%d, '%s')", $user['uid'], $user['pass']);
-      db_query("UPDATE {users} SET pass='%s' WHERE uid=%d", $md5_pass, $user['uid']);
-    }
-  }
-  
-  variable_set("aes_viewing_method", "collapsible");
-  
-  drupal_set_message(t('AES updated (1.0 -> 1.1).'));
-  
-  return $return;
-}
-
