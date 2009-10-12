@@ -1,3 +1,6 @@
-; $Id $
+; $Id$
 name = AES
 description = "Provides AES encryption."
+core = 6.x
+php = 4.3.0
+

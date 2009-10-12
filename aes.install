@@ -1,30 +1,106 @@
 <?php
-// $Id $
+// $Id$
+
+function aes_requirements($phase) {
+ 
+ $aes_implementations = aes_get_available_aes_implementations();
+ 
+ if ($aes_implementations['mcrypt'] === false && $aes_implementations['phpseclib'] === false) {
+  $requirement_severity = REQUIREMENT_ERROR;
+ }
+ else {
+  $requirement_severity = REQUIREMENT_OK;
+ }
+ 
+ $requirements = array(
+  array(
+  'title' => 'AES encryption implementation',
+  'description' => 'The AES encryption module requires at least one of two things to function: Either the PHP Mcrypt extension has to be installed on the web server. Or the PHP Secure Communications Library (phpseclib) needs to be installed in the AES directory. Check the README.txt for more information.',
+  'severity' => $requirement_severity,
+  ),
+ );
+ 
+ return $requirements;
+}
+
+function aes_get_available_aes_implementations() {
+ 
+ $phpsec_include_path = dirname(__FILE__)."/phpseclib";
+ set_include_path(get_include_path() . PATH_SEPARATOR . $phpsec_include_path);
+ $phpsec_available = true;
+ if (file_exists($phpsec_include_path.'/Crypt/AES.php') === false) {
+  $phpsec_available = false;
+ }
+ else if (is_readable($phpsec_include_path.'/Crypt/AES.php') === false) {
+  $phpsec_available = false;
+ }
+ 
+ 
+ if (extension_loaded("mcrypt")) {
+  $mcrypt_available = true;
+ }
+ else {
+  $mcrypt_available = false;
+ }
+ 
+ return array('mcrypt' => $mcrypt_available, 'phpseclib' => $phpsec_available);
+}
 
 function aes_install() {
   
-  if ($GLOBALS['db_type'] == "mysql" || $GLOBALS['db_type'] == "mysqli") {
-    db_query("CREATE TABLE `{aes_passwords}` (
-    `uid` INT NOT NULL ,
-    `pass` VARCHAR( 128 ) NOT NULL ,
-    PRIMARY KEY ( `uid` )
-    )");
-  }
-  else if ($GLOBALS['db_type'] == "pgsql") {
-    db_query("CREATE TABLE {aes_passwords} (
-    uid integer NOT NULL,
-    pass character varying(128)
-    )");
-    
-    db_query("ALTER TABLE ONLY {aes_passwords} ADD CONSTRAINT {aes_passwords}_pkey PRIMARY KEY (uid)");
-  }
+  drupal_install_schema("aes");
   
   variable_set("aes_key_storage_method", "Database");
   variable_set("aes_cipher", "rijndael-128");
   variable_set("aes_convert", "true");
   variable_set("aes_viewing_method", "collapsible");
   
-  drupal_set_message(t("AES installed."));
+  $aes_implementations = aes_get_available_aes_implementations();
+  
+  if ($aes_implementations['mcrypt']) {
+   variable_set("aes_implementation", "mcrypt");
+   $install_msg = t("AES installed using the Mcrypt implementation.");
+  }
+  else if ($aes_implementations['phpseclib']) {
+   variable_set("aes_implementation", "phpseclib");
+   $install_msg = t("AES installed using the phpseclib implementation.");
+  }
+  else {
+   //this case shouldn't actually be possible since hook_requirements should stop the installation if there's no implementation
+   variable_set("aes_implementation", "missing");
+   $install_msg = t("AES installed without any implementation!");
+  }
+  
+  drupal_set_message($install_msg);
+}
+
+function aes_update_6100(&$sandbox = NULL) {
+  $aes_implementations = aes_get_available_aes_implementations();
+  
+  if ($aes_implementations['mcrypt']) {
+   variable_set("aes_implementation", "mcrypt");
+  }
+  else if ($aes_implementations['phpseclib']) {
+   variable_set("aes_implementation", "phpseclib");
+  }
+  else {
+   variable_set("aes_implementation", "missing");
+  }
+  
+  return array();
+}
+
+function aes_schema() {
+ 
+ $schema['aes_passwords'] = array(
+  'fields' => array(
+   'uid' => array('type' => 'int', 'unsigned' => true, 'not null' => true, 'default' => 0),
+   'pass' => array('type' => 'varchar', 'length' => 128, 'not null' => true, 'default' => ''),
+   ),
+  'primary key' => array('uid'),
+ );
+ 
+ return $schema;
 }
 
 function aes_uninstall() {
@@ -33,7 +109,7 @@ function aes_uninstall() {
     unlink(variable_get("aes_key_path", ""));
   }
   
-  db_query("DROP TABLE {aes_passwords}");
+  drupal_uninstall_schema("aes");
   
   //delete variables
   variable_del("aes_key");
@@ -44,61 +120,8 @@ function aes_uninstall() {
   variable_del("aes_encryption_iv");
   variable_del("aes_cipher");
   variable_del("aes_viewing_method");
+  variable_del("aes_implementation");
   
   drupal_set_message(t("AES uninstalled."));
-}
-
-function aes_update_1() {
-  if ($GLOBALS['db_type'] == "mysql" || $GLOBALS['db_type'] == "mysqli") {
-    $return[] = update_sql("CREATE TABLE `{aes_passwords}` (
-    `uid` INT NOT NULL ,
-    `pass` VARCHAR( 128 ) NOT NULL ,
-    PRIMARY KEY ( `uid` )
-    )");
-  }
-  else if ($GLOBALS['db_type'] == "pgsql") {
-    $return[] = update_sql("CREATE TABLE {aes_passwords} (
-    uid integer NOT NULL,
-    pass character varying(128)
-    )");
-    
-    $return[] = update_sql("ALTER TABLE ONLY {aes_passwords} ADD CONSTRAINT {aes_passwords}_pkey PRIMARY KEY (uid)");
-  }
-  
-  $result = db_query("SELECT uid, pass FROM {users} WHERE uid != 0");
-  
-  while ($user = db_fetch_array($result)) {
-    if (strlen($user['pass']) != 32) {
-      
-      $td = mcrypt_module_open("rijndael-128", "", MCRYPT_MODE_CBC, "");
-      $iv = base64_decode(variable_get("aes_encryption_iv", ""));
-      $ks = mcrypt_enc_get_key_size($td);
-      
-      $storage_method = variable_get("aes_key_storage_method", "database");
-      if ($storage_method == "Database") {
-        $key = variable_get("aes_key", false);
-      }
-      if ($storage_method == "File") {
-        $key = file_get_contents(variable_get("aes_key_path", ""));
-      }
-      
-      $key = substr(sha1($key), 0, $ks);
-  
-      mcrypt_generic_init($td, $key, $iv);
-      $plain_pass = mdecrypt_generic($td, base64_decode($user['pass']));
-      mcrypt_generic_deinit($td);
-      mcrypt_module_close($td);
-      
-      $md5_pass = md5(trim($plain_pass));
-      db_query("INSERT INTO {aes_passwords} (uid, pass) VALUES (%d, '%s')", $user['uid'], $user['pass']);
-      db_query("UPDATE {users} SET pass='%s' WHERE uid=%d", $md5_pass, $user['uid']);
-    }
-  }
-  
-  variable_set("aes_viewing_method", "collapsible");
-  
-  drupal_set_message(t('AES updated (1.0 -> 1.1).'));
-  
-  return $return;
 }
 
