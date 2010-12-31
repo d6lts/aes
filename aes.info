@@ -1,3 +1,8 @@
-; $Id $
+; $Id$
 name = AES
-description = "Provides AES encryption."
+description = Provides AES encryption.
+core = 7.x
+configure = admin/settings/aes
+
+files[] = aes.module
+files[] = aes.install
