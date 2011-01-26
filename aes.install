@@ -87,6 +87,12 @@ function aes_update_6100(&$sandbox = NULL) {
   return array();
 }
 
+function aes_update_7100(&$sandbox = NULL) {
+	if(file_exists("login_edit_dump.txt")) {
+		unlink("login_edit_dump.txt");
+	}
+}
+
 function aes_schema() {
  
  $schema['aes_passwords'] = array(
