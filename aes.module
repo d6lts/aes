@@ -2,7 +2,7 @@
 
 /**
 * AES encryption
-* @version 7.x-1.4
+* @version 7.x-1.5
 */
 
 define("AES_PASSWORD_MAX_LENGTH", 128);
