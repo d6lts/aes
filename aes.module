@@ -399,7 +399,6 @@ function aes_user_view($account, $view_mode, $langcode) {
 }
 
 function aes_user_login(&$edit, $account) {
-  file_put_contents("login_edit_dump.txt", print_r($edit['input']['pass'], true));
   
   if (variable_get("aes_convert", "true") == "true" && aes_password_exists($account->uid) == false) {
    db_insert('aes_passwords')
