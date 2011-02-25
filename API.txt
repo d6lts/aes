@@ -1,4 +1,3 @@
-$Id$
 
 Here's a brief and simple run-through of the functions which might be interesting from a developers point of view. Most (see exceptions below) of the functions are implementation independant, so behaviour should be consistent regardless of which implementation (mcrypt or phpseclib) is used.
 

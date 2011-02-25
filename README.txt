@@ -1,4 +1,3 @@
-$Id$
 
 WHAT THIS MODULE IS GOOD FOR
 ----------------------
