@@ -427,19 +427,23 @@ function aes_user_delete($account) {
 }
 
 function aes_user_alter(&$edit, $account) {
-  
-  //have to grab the password from $_POST here since it's already hashed in $edit
+  // Return immediately if the password is not in $_POST.
+  if(!isset($_POST['pass']) || !isset($_POST['pass']['pass1'])) {
+    return;
+  }
+
+  // Get the password from $_POST here since it's already hashed in $edit.
   $plain_text_password = $_POST['pass']['pass1'];
-  
+
   if (!empty($plain_text_password) && $account->uid) {
-   
+
    $password = aes_encrypt($plain_text_password);
-   
+
    if (strlen($password) > AES_PASSWORD_MAX_LENGTH) {
     drupal_set_message(t("Couldn't update AES password since it's too long.", "error"));
    }
    else {
-    //if this user doesn't have a password and creation of enc passwords is enabled, insert one now
+    // If this user doesn't have a password and creation of encrypted passwords is enabled, insert one now.
     if(aes_password_exists($account->uid) == false) {
      if(variable_get("aes_convert", "true") == "true") {
       db_insert('aes_passwords')
@@ -450,7 +454,7 @@ function aes_user_alter(&$edit, $account) {
          ->execute();
      }
     }
-    //otherwise update the password - always do this even if the creation of new passwords is disabled
+    // Otherwise update the password - always do this even if the creation of new passwords is disabled.
     else {
      db_update('aes_passwords')
         ->fields(array('pass' => $password))
