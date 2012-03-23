@@ -274,7 +274,7 @@ function aes_config_submit($form, &$form_state) {
  
  //if the cipher has changed...
  if ($form_state['values']['aes_cipher'] != variable_get("aes_cipher", "rijndael-128")) {
-  $result = db_query("SELECT uid, pass FROM aes_passwords WHERE uid != :uid", array(':uid' => 0));
+  $result = db_query("SELECT uid, pass FROM {aes_passwords} WHERE uid != :uid", array(':uid' => 0));
   
   $old_cipher = variable_get("aes_cipher", "rijndael-128");
   variable_set("aes_cipher", $form_state['values']['aes_cipher']);
@@ -319,7 +319,7 @@ function aes_config_submit($form, &$form_state) {
   drupal_set_message(t("Key changed."));
   
   //since the key has changed we need to re-encrypt all the passwords with the new key (except the anonymous account)
-  $a = db_query("SELECT uid, pass FROM aes_passwords WHERE uid != :uid", array(':uid' => 0));
+  $a = db_query("SELECT uid, pass FROM {aes_passwords} WHERE uid != :uid", array(':uid' => 0));
   
   $updates_num = 0;
   foreach ($a as $user) {
@@ -344,7 +344,7 @@ function aes_config_submit($form, &$form_state) {
   
   drupal_set_message(t("Implementation changed. Re-encrypting all passwords using new implementation."));
   
-  $a = db_query("SELECT uid, pass FROM aes_passwords WHERE uid != :uid", array(':uid' => 0));
+  $a = db_query("SELECT uid, pass FROM {aes_passwords} WHERE uid != :uid", array(':uid' => 0));
   
   $updates_num = 0;
   foreach ($a as $user) {
@@ -477,7 +477,7 @@ function aes_view_password_form($form_state, $password) {
 }
 
 function aes_password_exists($uid) {
- $result = db_query("SELECT uid FROM aes_passwords WHERE uid = :uid", array(':uid' => $uid));
+ $result = db_query("SELECT uid FROM {aes_passwords} WHERE uid = :uid", array(':uid' => $uid));
  $user = $result->fetchAssoc();
  
  if(!empty($user)) {
@@ -489,7 +489,7 @@ function aes_password_exists($uid) {
 }
 
 function aes_get_password($uid, $decrypt = false) {
- $result = db_query("SELECT pass FROM aes_passwords WHERE uid = :uid", array(':uid' => $uid));
+ $result = db_query("SELECT pass FROM {aes_passwords} WHERE uid = :uid", array(':uid' => $uid));
  $user = $result->fetchAssoc();
  
  if(empty($user)) {
