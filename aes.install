@@ -1,22 +1,31 @@
 <?php
 
 function aes_requirements($phase) {
- 
+ // make sure translations won't break on install
+ $t = get_t();
  $aes_implementations = aes_get_available_aes_implementations();
  
  if ($aes_implementations['mcrypt'] === false && $aes_implementations['phpseclib'] === false) {
   $requirement_severity = REQUIREMENT_ERROR;
+  $value = $t('The AES encryption module requires at least one of two things to function: Either the PHP Mcrypt extension has to be installed on the web server, or the PHP Secure Communications Library (phpseclib) needs to be installed in the AES directory. Check the README.txt for more information.');
  }
  else {
   $requirement_severity = REQUIREMENT_OK;
+  if ($aes_implementations['mcrypt'] && $aes_implementations['phpseclib']) {
+   $value = t('Both MCrypt and PHP Secure Communications Library are available.');
+  }
+  else if ($aes_implementations['mcrypt']) {
+   $value = t('MCrypt is available.');
+  }
+  else {
+   $value = t('PHP Secure Communications Library is available.');
+  }
  }
- 
- $requirements = array(
-  array(
-  'title' => t('AES encryption implementation'),
-  'description' => t('The AES encryption module requires at least one of two things to function: Either the PHP Mcrypt extension has to be installed on the web server. Or the PHP Secure Communications Library (phpseclib) needs to be installed in the AES directory. Check the README.txt for more information.'),
+
+ $requirements['aes'] = array(
+  'title' => $t('AES encryption implementation'),
+  'value' => $value,
   'severity' => $requirement_severity,
-  ),
  );
  
  return $requirements;
