@@ -1,0 +1,40 @@
+From b378174f74a88f0843b71e674a904681eba3d60a Mon Sep 17 00:00:00 2001
+From: Robin Monks <devlinks@gmail.com>
+Date: Thu, 17 Mar 2011 11:50:54 -0300
+Subject: [PATCH 2/2] See Admin Menu
+
+---
+ aes.info   |    2 +-
+ aes.module |    3 +--
+ 2 files changed, 2 insertions(+), 3 deletions(-)
+
+diff --git a/aes.info b/aes.info
+index 73dd88f..9287353 100755
+--- a/aes.info
++++ b/aes.info
+@@ -1,7 +1,7 @@
+ name = AES
+ description = Provides AES encryption.
+ core = 7.x
+-configure = admin/settings/aes
++configure = admin/config/system/aes
+ 
+ files[] = aes.module
+ files[] = aes.install
+diff --git a/aes.module b/aes.module
+index ddd4ca0..507b5be 100755
+--- a/aes.module
++++ b/aes.module
+@@ -13,8 +13,7 @@ define("CRYPT_AES_MODE", 1);
+ function aes_menu() {
+  
+  $items = array();
+- //
+- $items['admin/settings/aes'] = array(
++ $items['admin/config/system/aes'] = array(
+  'title' => 'AES settings',
+  'description' => 'Configure the AES encryption module.',
+  'page callback' => 'drupal_get_form',
+-- 
+1.7.3.1.msysgit.0
+

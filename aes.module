@@ -13,8 +13,7 @@ define("CRYPT_AES_MODE", 1);
 function aes_menu() {
  
  $items = array();
- //
- $items['admin/settings/aes'] = array(
+ $items['admin/config/system/aes'] = array(
  'title' => 'AES settings',
  'description' => 'Configure the AES encryption module.',
  'page callback' => 'drupal_get_form',
