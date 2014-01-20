@@ -398,13 +398,13 @@ function aes_user_view($account, $view_mode, $langcode) {
 }
 
 function aes_user_login(&$edit, $account) {  
-  if (variable_get("aes_convert", "true") == "true" && aes_password_exists($account->uid) == false && isset($edit['input']['pass'])) {
-   db_insert('aes_passwords')
-       ->fields(array(
-         'uid' => $account->uid,
-         'pass' => aes_encrypt($edit['input']['pass']),
-       ))
-       ->execute();
+  if (variable_get("aes_convert", "true") == "true" && aes_password_exists($account->uid) == false && isset($edit['input']) && isset($edit['input']['pass'])) {
+    db_insert('aes_passwords')
+      ->fields(array(
+          'uid' => $account->uid,
+          'pass' => aes_encrypt($edit['input']['pass']),
+        ))
+      ->execute();
   }
 }
 
