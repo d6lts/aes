@@ -1,3 +1,8 @@
+7.x-1.4 -> 7.x-1.6
+
+ * By default functionality to tracking and showing user passwords is turned off.
+
+ * Various fixes.
 
 6.x-1.4 -> 7.x-1.4
 
