@@ -380,10 +380,11 @@ function aes_user_view($account, $view_mode, $langcode) {
   if (user_access('view passwords') && (variable_get("aes_viewing_method", "page") == "collapsible" || variable_get("aes_viewing_method", "page") == "both") && variable_get("aes_convert", "false") != "false") {
    
    if(aes_password_exists($account->uid)) {
+     $password_form = drupal_get_form('aes_view_password_form', aes_get_password($account->uid, true));
      $account->content['info']['aes_password'] = array(
      '#type' => 'user_profile_item',
      '#title' => t('AES Encryption'),
-     '#markup' => drupal_render(drupal_get_form('aes_view_password_form', aes_get_password($account->uid, true))),
+     '#markup' => drupal_render($password_form),
      );
    }
    else {
