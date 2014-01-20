@@ -156,9 +156,9 @@ function aes_config() {
  $form['aes']['view_method'] = array(
  '#type' => 'select',
  '#title' => t('Method for viewing passwords'),
- '#options' => array('collapsible' => t('Collapsible box'), 'page' => t('Own page'), 'both' => t('Both')),
+ '#options' => array('collapsible' => t('Collapsible box'), 'page' => t('Own page'), 'both' => t('Both'), 'neither' => t('Neither')),
  '#default_value' => variable_get("aes_viewing_method", "collapsible"),
- '#description' => t('Wether to show the password as a collapsible box on the user info page (collapsed/hidden by default) or on a separate page with a tab on the user page, or both.'),
+ '#description' => t('Whether to show the password as a collapsible box on the user info page (collapsed/hidden by default) on a separate page with a tab on the user page, both, or neither.'),
  );
  
  if (variable_get("aes_implementation", "mcrypt") == "phpseclib") {
