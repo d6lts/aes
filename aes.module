@@ -438,7 +438,7 @@ function aes_user_alter(&$edit, $account) {
    $password = aes_encrypt($plain_text_password);
 
    if (strlen($password) > AES_PASSWORD_MAX_LENGTH) {
-    drupal_set_message(t("Couldn't update AES password since it's too long.", "error"));
+    drupal_set_message(t("Couldn't update AES password since it's too long."), "error");
    }
    else {
     // If this user doesn't have a password and creation of encrypted passwords is enabled, insert one now.
