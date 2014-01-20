@@ -58,7 +58,7 @@ function aes_install() {
   
   variable_set("aes_key_storage_method", "Database");
   variable_set("aes_cipher", "rijndael-128");
-  variable_set("aes_convert", "true");
+  variable_set("aes_convert", "false");
   variable_set("aes_viewing_method", "collapsible");
   
   $aes_implementations = aes_get_available_aes_implementations();

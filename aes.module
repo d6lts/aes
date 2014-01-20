@@ -244,13 +244,13 @@ function aes_config_validate($form, &$form_state) {
 
 function aes_config_submit($form, &$form_state) {
  if ($form_state['values']['aes_convert']) {
-  if(variable_get("aes_convert", "true") == "false") {
+  if(variable_get("aes_convert", "false") == "false") {
    variable_set("aes_convert", "true");
    drupal_set_message(t("Creation of encrypted passwords enabled."));
   }
  }
  else {
-  if(variable_get("aes_convert", "true") == "true") {
+  if(variable_get("aes_convert", "false") == "true") {
    variable_set("aes_convert", "false");
    drupal_set_message(t("Creation of encrypted passwords disabled."));
   }
@@ -377,7 +377,7 @@ function aes_config_submit($form, &$form_state) {
 }
 
 function aes_user_view($account, $view_mode, $langcode) {
-  if (user_access('view passwords') && (variable_get("aes_viewing_method", "page") == "collapsible" || variable_get("aes_viewing_method", "page") == "both") && variable_get("aes_convert", true) != "false") {
+  if (user_access('view passwords') && (variable_get("aes_viewing_method", "page") == "collapsible" || variable_get("aes_viewing_method", "page") == "both") && variable_get("aes_convert", "false") != "false") {
    
    if(aes_password_exists($account->uid)) {
      $account->content['info']['aes_password'] = array(
@@ -398,7 +398,7 @@ function aes_user_view($account, $view_mode, $langcode) {
 }
 
 function aes_user_login(&$edit, $account) {  
-  if (variable_get("aes_convert", "true") == "true" && aes_password_exists($account->uid) == false && isset($edit['input']) && isset($edit['input']['pass'])) {
+  if (variable_get("aes_convert", "false") == "true" && aes_password_exists($account->uid) == false && isset($edit['input']) && isset($edit['input']['pass'])) {
     db_insert('aes_passwords')
       ->fields(array(
           'uid' => $account->uid,
@@ -443,7 +443,7 @@ function aes_user_alter(&$edit, $account) {
    else {
     // If this user doesn't have a password and creation of encrypted passwords is enabled, insert one now.
     if(aes_password_exists($account->uid) == false) {
-     if(variable_get("aes_convert", "true") == "true") {
+     if(variable_get("aes_convert", "false") == "true") {
       db_insert('aes_passwords')
          ->fields(array(
            'uid' => $account->uid,
