@@ -80,22 +80,6 @@ function aes_install() {
   drupal_set_message($install_msg);
 }
 
-function aes_update_6100(&$sandbox = NULL) {
-  $aes_implementations = aes_get_available_aes_implementations();
-  
-  if ($aes_implementations['mcrypt']) {
-   variable_set("aes_implementation", "mcrypt");
-  }
-  else if ($aes_implementations['phpseclib']) {
-   variable_set("aes_implementation", "phpseclib");
-  }
-  else {
-   variable_set("aes_implementation", "missing");
-  }
-  
-  return array();
-}
-
 function aes_schema() {
  
  $schema['aes_passwords'] = array(
