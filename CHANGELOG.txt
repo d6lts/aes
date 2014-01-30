@@ -1,6 +1,10 @@
+7.x-1.7 -> 7.x-1.x-dev
+
+  * Phpseclib: Integrated AES with the libraries API. PHPSeclib now preferable to be placed into libraries.
+
 7.x-1.6 -> 7.x-1.7
 
-  Fixed critical issue preventing module to normal usage by Aegir hosting system.
+  * Fixed critical issue preventing module to normal usage by Aegir hosting system.
 
 7.x-1.4 -> 7.x-1.6
 
