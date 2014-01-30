@@ -43,7 +43,13 @@ function aes_requirements($phase) {
 }
 
 function aes_get_available_aes_implementations() {
-  $phpsec_include_path = dirname(__FILE__) . "/phpseclib";
+  if (module_exists('libraries') && libraries_get_path('phpseclib')) {
+    $phpsec_include_path = libraries_get_path('phpseclib');
+  }
+  else {
+    $phpsec_include_path = dirname(__FILE__) . '/phpseclib';
+  }
+
   set_include_path(get_include_path() . PATH_SEPARATOR . $phpsec_include_path);
   $phpsec_available = TRUE;
   if (file_exists($phpsec_include_path . '/Crypt/AES.php') === FALSE) {

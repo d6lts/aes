@@ -57,7 +57,12 @@ function aes_permission() {
 function aes_load_phpsec() {
 
   // Find out where this module is located and set up an include path for the phpsec library.
-  $phpsec_include_path = dirname(__FILE__) . "/phpseclib";
+  if (module_exists('libraries') && libraries_get_path('phpseclib')) {
+    $phpsec_include_path = libraries_get_path('phpseclib');
+  }
+  else {
+    $phpsec_include_path = dirname(__FILE__) . '/phpseclib';
+  }
 
   // Include phpsec AES lib.
   if (file_exists($phpsec_include_path . '/Crypt/AES.php') === FALSE) {
