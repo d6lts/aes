@@ -2,6 +2,8 @@
 
   * Phpseclib: Integrated AES with the libraries API. PHPSeclib now preferable to be placed into libraries.
 
+  * Fixed major bug with changing location of key file, thanks to digitalRoots. Issue: https://drupal.org/node/2188325 .
+
 7.x-1.6 -> 7.x-1.7
 
   * Fixed critical issue preventing module to normal usage by Aegir hosting system.

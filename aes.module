@@ -272,16 +272,20 @@ function aes_config_submit($form, &$form_state) {
     }
   }
 
-  variable_set("aes_key_path", $form_state['values']['aes_key_path']);
-
-  // Check if the storage method has changed.
-  if ($form_state['values']['aes_key_storage_method'] != variable_get("aes_key_storage_method", "")) {
-    // If it has changed, we need to move the key to the new storage.
-    drupal_set_message(t("Switching key storage method to %method.", array('%method' => $form_state['values']['aes_key_storage_method'])));
+  // Check if the storage method or key path has changed.
+  if (($form_state['values']['aes_key_storage_method'] != variable_get("aes_key_storage_method", "")) || ($form_state['values']['aes_key_path'] != variable_get("aes_key_path",""))) {
+    // If it has changed, we need to move the key.
+    if ($form_state['values']['aes_key_storage_method'] != variable_get("aes_key_storage_method", "")) {
+      drupal_set_message(t("Switching key storage method to %method.", array('%method' => $form_state['values']['aes_key_storage_method'])));
+    } else {
+      drupal_set_message(t("Changed key file path."));
+    }
     // get the key
     $key = aes_get_key();
     // delete the key from the old storage
     aes_delete_key(variable_get("aes_key_storage_method", ""));
+    // set key path
+    variable_set("aes_key_path", $form_state['values']['aes_key_path']);
     // set the new storage
     variable_set("aes_key_storage_method", $form_state['values']['aes_key_storage_method']);
     // store the key in its new location
