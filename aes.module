@@ -50,6 +50,7 @@ function aes_permission() {
     'view passwords' => array(
       'title' => t('View passwords'),
       'description' => t('View user password in plain text.'),
+      'restrict access' => TRUE,
     ),
   );
 }
