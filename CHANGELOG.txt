@@ -1,3 +1,7 @@
+7.x-1.8 -> 8.x-2.0
+
+  * Initiated porting to Drupal 8.
+
 7.x-1.7 -> 7.x-1.8
 
   * Phpseclib: Integrated AES with the libraries API. PHPSeclib now preferable to be placed into libraries.
