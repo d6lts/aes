@@ -11,12 +11,11 @@
  */
 function aes_requirements($phase) {
   // Make sure translations won't break on install.
-  $t = get_t();
   $aes_implementations = aes_get_available_aes_implementations();
 
   if ($aes_implementations['mcrypt'] === FALSE && $aes_implementations['phpseclib'] === FALSE) {
     $requirement_severity = REQUIREMENT_ERROR;
-    $value = $t('The AES encryption module requires at least one of two things to function: Either the PHP Mcrypt extension has to be installed on the web server, or the PHP Secure Communications Library (phpseclib) needs to be installed in the AES directory. Check the README.txt for more information.');
+    $value = t('The AES encryption module requires at least one of two things to function: Either the PHP Mcrypt extension has to be installed on the web server, or the PHP Secure Communications Library (phpseclib) needs to be installed in the AES directory. Check the README.txt for more information.');
   }
   else {
     $requirement_severity = REQUIREMENT_OK;
@@ -34,7 +33,7 @@ function aes_requirements($phase) {
   }
 
   $requirements['aes'] = array(
-    'title' => $t('AES encryption implementation'),
+    'title' => t('AES encryption implementation'),
     'value' => $value,
     'severity' => $requirement_severity,
   );
@@ -43,21 +42,18 @@ function aes_requirements($phase) {
 }
 
 function aes_get_available_aes_implementations() {
-  if (module_exists('libraries') && libraries_get_path('phpseclib')) {
+  $phpsec_available = FALSE;
+  if (\Drupal::moduleHandler()->moduleExists('libraries') && libraries_get_path('phpseclib')) {
     $phpsec_include_path = libraries_get_path('phpseclib');
-  }
-  else {
-    $phpsec_include_path = dirname(__FILE__) . '/phpseclib';
-  }
-
-  set_include_path(get_include_path() . PATH_SEPARATOR . $phpsec_include_path);
-  $phpsec_available = TRUE;
-  if (file_exists($phpsec_include_path . '/Crypt/AES.php') === FALSE) {
-    $phpsec_available = FALSE;
-  }
-  else {
-    if (is_readable($phpsec_include_path . '/Crypt/AES.php') === FALSE) {
+    set_include_path(get_include_path() . PATH_SEPARATOR . $phpsec_include_path);
+    $phpsec_available = TRUE;
+    if (!file_exists($phpsec_include_path . '/Crypt/AES.php') === FALSE) {
       $phpsec_available = FALSE;
+    }
+    else {
+      if (is_readable($phpsec_include_path . '/Crypt/AES.php') === FALSE) {
+        $phpsec_available = FALSE;
+      }
     }
   }
 
@@ -72,84 +68,43 @@ function aes_get_available_aes_implementations() {
 }
 
 function aes_install() {
-  $t = get_t();
-
-  variable_set("aes_key_storage_method", "Database");
-  variable_set("aes_cipher", "rijndael-128");
-  variable_set("aes_convert", FALSE);
-  variable_set("aes_viewing_method", "collapsible");
-
   $aes_implementations = aes_get_available_aes_implementations();
 
+  $config = \Drupal::config('aes.settings');
+
   if ($aes_implementations['mcrypt']) {
-    variable_set("aes_implementation", "mcrypt");
-    $install_msg = $t("AES installed using the Mcrypt implementation.");
+    $config->set("implementation", "mcrypt");
+    $install_msg = t("AES installed using the Mcrypt implementation.");
   }
   else {
     if ($aes_implementations['phpseclib']) {
-      variable_set("aes_implementation", "phpseclib");
-      $install_msg = $t("AES installed using the phpseclib implementation.");
+      $config->set("implementation", "phpseclib");
+      $install_msg = t("AES installed using the phpseclib implementation.");
     }
     else {
       // This case shouldn't actually be possible since hook_requirements should stop the installation if there's no implementation.
-      variable_set("aes_implementation", "missing");
-      $install_msg = $t("AES installed without any implementation!");
+      $config->set("implementation", "missing");
+      $install_msg = t("AES installed without any implementation!");
     }
   }
 
+  $config->save();
   drupal_set_message($install_msg);
-}
 
-/**
- * Implements hook_schema().
- */
-function aes_schema() {
+  if ($config->get("implementation") == "mcrypt") {
+    $iv = $config->get("mcrypt_iv");
+    if (empty($iv)) {
+      aes_make_iv();
+    }
+  }
 
-  $schema['aes_passwords'] = array(
-    'fields' => array(
-      'uid' => array('type' => 'int', 'unsigned' => TRUE, 'not null' => TRUE, 'default' => 0),
-      'pass' => array('type' => 'varchar', 'length' => 128, 'not null' => TRUE, 'default' => ''),
-    ),
-    'primary key' => array('uid'),
-  );
-
-  return $schema;
+  // This will create a new key if one doesn't exist.
+  aes_get_key();
 }
 
 /**
  * Implements hook_uninstall().
  */
 function aes_uninstall() {
-  // Delete keyfile.
-  if (variable_get("aes_key_storage_method", "") == "File") {
-    unlink(variable_get("aes_key_path", ""));
-  }
-
-  //delete variables
-  variable_del("aes_key");
-  variable_del("aes_convert");
-  variable_del("aes_key_storage_method");
-  variable_del("aes_key_path");
-  variable_del("aes_key");
-  variable_del("aes_encryption_iv");
-  variable_del("aes_cipher");
-  variable_del("aes_viewing_method");
-  variable_del("aes_implementation");
-
   drupal_set_message(t("AES uninstalled."));
-}
-
-/**
- * Convert old setting for aes_convert from string to boolean.
- */
-function aes_update_7100(&$sandbox) {
-  $old_value = variable_get("aes_convert", FALSE);
-  if (is_string($old_value)) {
-    $old_value = strtolower($old_value);
-    $new_value = ($old_value === 'true');
-  }
-  else {
-    $new_value = (bool) $old_value;
-  }
-  variable_set("aes_convert", $new_value);
 }

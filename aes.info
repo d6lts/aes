@@ -1,7 +1,0 @@
-name = AES
-description = Provides AES encryption.
-core = 7.x
-configure = admin/config/system/aes
-
-files[] = aes.module
-files[] = aes.install
