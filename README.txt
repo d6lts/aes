@@ -27,7 +27,7 @@ HOW TO GET AN AES IMPLEMENTATION
 If you don't have an AES implementation (you'll notice this when you install this module) then the easiest implementation for you to get is probably the PHP Secure Communications Library (phpseclib).
 
 Just download the latest version from http://phpseclib.sourceforge.net/ and extract it into a directory called "phpseclib" inside the aes directory. Note that the zip file of the version of phpseclib that this module was developed with doesn't create the phpseclib directory itself, it just extracts its various directories directly into the location you unzip it, so create that "phpseclib" directory first and then move the zip file into it, and unzip. The complete path to the file which will be included by this module (AES.php) should look like this:
-aes/phpseclib/Crypt/AES.php
+aes/phpseclib/Crypt/AES.php . You also may install PhpSecLib as a regular Drupal library.
 
 That's it! Try installing/enabling the module again.
 
