@@ -106,5 +106,6 @@ function aes_install() {
  * Implements hook_uninstall().
  */
 function aes_uninstall() {
+  // @todo: send email to admin.
   drupal_set_message(t("AES uninstalled."));
 }

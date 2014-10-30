@@ -10,24 +10,6 @@
 define("CRYPT_AES_MODE", 1);
 
 /**
- * Implements hook_menu().
- */
-function aes_menu() {
-
-  $items = array();
-  $items['admin/config/system/aes'] = array(
-    'title' => 'AES settings',
-    'description' => 'Configure the AES encryption module.',
-    'page callback' => 'drupal_get_form',
-    'page arguments' => array('aes_config'),
-    'access arguments' => array('administer aes'),
-    'type' => MENU_NORMAL_ITEM,
-  );
-
-  return $items;
-}
-
-/**
  * Implements hook_permission().
  */
 function aes_permission() {
