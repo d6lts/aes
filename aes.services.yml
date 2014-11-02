@@ -1,0 +1,4 @@
+services:
+  plugin.aes:
+    class: Drupal\aes\Plugin\AesPlugin
+    arguments: ['@aes.settings']

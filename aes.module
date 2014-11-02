@@ -214,6 +214,8 @@ function aes_config_submit($form, &$form_state) {
   $config->save();
 }
 
+function watchdog() {}
+
 function aes_get_key() {
   $key = \Drupal::config('aes.settings')->get("key");
   if (empty($key)) {

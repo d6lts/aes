@@ -5,3 +5,7 @@ aes.admin_page:
     _title: 'AES settings'
   requirements:
     _permission: 'administer aes'
+aes.sample:
+  path: '/admin/config/system/aes/test'
+  defaults:
+    { _controller: AesController:samplePage }

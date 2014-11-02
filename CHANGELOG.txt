@@ -42,7 +42,7 @@
  
  * Ported the module to Drupal 6.
  
- * AES no longer alerts the user about a missing key if the user does not have the administer aes permission. This alert is now also logged in the watchdog.
+ * AES no longer alerts the user about a missing key if the user does not have the administer aes permission. This alert is now also logged into logging system.
  
  * Fixed a bug which caused AES encrypted passwords to be created even when this feature was turned off if an existing account was given a new password.
 

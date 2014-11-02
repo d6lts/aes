@@ -5,7 +5,7 @@ Implementation independence exceptions:
 
 1. aes_make_iv is mute when using phpseclib since that implementation handle its own IV internally.
 
-2. The $custom_cipher and $custom_iv arguments to aes_encrypt and aes_decrypt are ignored when using phpseclib, since that implementation doesn't support changing these values. Passing these arguments as anything else than null will generate warnings in the watchdog when using phpseclib.
+2. The $custom_cipher and $custom_iv arguments to aes_encrypt and aes_decrypt are ignored when using phpseclib, since that implementation doesn't support changing these values. Passing these arguments as anything else than null will generate warnings when using phpseclib.
 
 ---------------------------------------------------------------------------------
 Function:
