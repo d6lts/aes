@@ -1,4 +1,4 @@
 services:
-  plugin.aes:
-    class: Drupal\aes\Plugin\AesPlugin
-    arguments: ['@aes.settings']
+  aes.crypt:
+    class: Drupal\aes\AesCryptManager
+    arguments: ['@config.factory']

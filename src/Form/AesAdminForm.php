@@ -22,16 +22,13 @@ class AesAdminForm extends ConfigFormBase {
   }
 
   /**
-   * Constructs an object.
-   */
-  public function __construct() {
-  }
-
-  /**
    * {@inheritdoc}
    */
   public function buildForm(array $form, FormStateInterface $form_state) {
-    $config = \Drupal::config('aes.settings');
+    $config = $this->config('aes.settings');
+
+    // @todo clean-up
+    //$srv = \Drupal
 
     $phpseclib_error_msg = "";
 
@@ -139,5 +136,6 @@ class AesAdminForm extends ConfigFormBase {
    */
   public function submitForm(array &$form, FormStateInterface $form_state) {
     drupal_set_message(t('BLAH!!.'));
+    aes_config_submit($form, $form_state);
   }
 }

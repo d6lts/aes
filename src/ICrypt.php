@@ -6,7 +6,8 @@
  * Time: 12:05 PM
  */
 
-namespace Drupal\aes\Plugin;
+
+namespace Drupal\aes;
 
 /**
  * Interface ICrypt
@@ -14,6 +15,8 @@ namespace Drupal\aes\Plugin;
  * @todo: describe
  */
 interface ICrypt {
-  //public function encrypt($data, AesImplementation = NULL);
-  //public function decrypt($data, AesImplementation = NULL);
+
+  public function encrypt($string);
+
+  public function decrypt($string);
 }

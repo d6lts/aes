@@ -8,4 +8,4 @@ aes.admin_page:
 aes.sample:
   path: '/admin/config/system/aes/test'
   defaults:
-    { _controller: AesController:samplePage }
+    { _controller: \Drupal\aes\Controller\AesController:samplePage }

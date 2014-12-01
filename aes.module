@@ -9,6 +9,8 @@
 // Set phpseclib to use its internal implementation even if mcrypt is available.
 define("CRYPT_AES_MODE", 1);
 
+use Drupal\Core\Form\FormStateInterface;
+
 /**
  * Implements hook_permission().
  */
@@ -24,7 +26,7 @@ function aes_permission() {
 function aes_load_phpsec() {
 
   // Find out where this module is located and set up an include path for the phpsec library.
-  if (module_exists('libraries') && libraries_get_path('phpseclib')) {
+  if (\Drupal::moduleHandler()->moduleExists('libraries') && libraries_get_path('phpseclib')) {
     $phpsec_include_path = libraries_get_path('phpseclib');
   }
   else {
@@ -168,22 +170,27 @@ function aes_config_validate($form, &$form_state) {
 
 /**
  * @param $form
- * @param $form_state
+ * @param FormStateInterface $form_state
  *
  * @todo: invoke own hook to notify about key change
  */
-function aes_config_submit($form, &$form_state) {
+function aes_config_submit($form, $form_state) {
+//  FormStateInterface;
+  var_dump($form_state->getValue('aes_cipher'));
   $config = \Drupal::config('aes.settings');
+
   // If the cipher has changed...
-  if ($form_state['values']['aes_cipher'] != $config->get("cipher")) {
+  $old = $config->get("cipher");
+  $new = $form_state->getValue('aes_cipher');
+  if ($form_state->getValue('aes_cipher') != $config->get("cipher")) {
     $old_cipher = $config->get("cipher");
-    $config->set("cipher", $form_state['values']['aes_cipher']);
-    $new_cipher = $form_state['values']['aes_cipher'];
+    $config->set("cipher", $form_state->getValue('aes_cipher'));
+    $new_cipher = $form_state->getValue('aes_cipher');
 
     // Get the old iv.
     $old_iv = $config->get("mcrypt_iv");
     // update the cipher the system uses
-    $config->set("cipher", $form_state['values']['aes_cipher']);
+    $config->set("cipher", $form_state->getValue('aes_cipher'));
     // create a new iv to match the new cipher
     aes_make_iv();
     // get the new iv
@@ -191,20 +198,21 @@ function aes_config_submit($form, &$form_state) {
   }
 
   // If the key has changed...
-  if (!empty($form_state['values']['aes_key'])) {
+  $new_key = $form_state->getValue('aes_key');
+  if (!empty($new_key)) {
     $old_key = aes_get_key();
-    $config->set('key', ($form_state['values']['aes_key']));
+    $config->set('key', $new_key);
 
     drupal_set_message(t("Key changed."));
     // @todo: invoke hook?
   }
 
   // If the implementation has changed...
-  if ($form_state['values']['aes_implementation'] != $config->get("implementation")) {
+  if ($form_state->getValue('aes_implementation') != $config->get("implementation")) {
 
-    $config->set("implementation", $form_state['values']['aes_implementation']);
+    $config->set("implementation", $form_state->getValue('aes_implementation'));
 
-    if ($form_state['values']['aes_implementation'] == "phpseclib") {
+    if ($form_state->getValue('aes_implementation') == "phpseclib") {
       // If we have switched to phpseclib implementation, set the cipher to 128, since it's the only one phpseclib supports.
       $config->set("cipher", "rijndael-128");
       // Create a new IV, this IV won't actually be used by phpseclib, but it's needed if the implementation is switched back to mcrypt.
