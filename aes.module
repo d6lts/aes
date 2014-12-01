@@ -210,14 +210,12 @@ function aes_config_submit($form, $form_state) {
   $config->save();
 }
 
-function watchdog() {}
-
 function aes_get_key() {
   $key = \Drupal::config('aes.settings')->get("key");
   if (empty($key)) {
     $key = aes_make_key();
     \Drupal::config('aes.settings')->set("key", $key)->save();
-    watchdog("aes", "AES module made a new key since one couldn't be found.");
+    \Drupal::logger('aes')->notice("AES module made a new key since one couldn't be found.");
   }
   return $key;
 }
@@ -268,7 +266,7 @@ function aes_make_iv($ignore_implementation = FALSE) {
 
   // Bail out if using phpseclib
   if ($config->get("implementation") == "phpseclib" && $ignore_implementation == FALSE) {
-    watchdog("aes", "Called aes_make_iv when using phpseclib. This is harmless, but shouldn't happen.", array(), WATCHDOG_WARNING);
+    \Drupal::logger('aes')->warning("Called aes_make_iv when using phpseclib. This is harmless, but shouldn't happen.");
     return;
   }
 
@@ -309,7 +307,7 @@ function aes_encrypt($string, $base64encode = TRUE, $custom_key = NULL, $custom_
 
   // Bail out if the passed string is empty.
   if (empty($string)) {
-    watchdog("aes", "Tried to encrypt an empty string.", array(), WATCHDOG_WARNING);
+    \Drupal::logger('aes')->warning("Tried to encrypt an empty string.");
     return FALSE;
   }
 
@@ -339,10 +337,10 @@ function aes_encrypt($string, $base64encode = TRUE, $custom_key = NULL, $custom_
 
     // phpseclib doesn't support custom ciphers and iv's.
     if (is_null($custom_cipher) == FALSE) {
-      watchdog("aes", "A custom cipher was defined when encrypting a string in the AES module using the phpseclib implementation. This implementation doesn't support custom ciphers therefore the argument was ignored and the encryption was done with the standard cipher.", array(), WATCHDOG_WARNING);
+      \Drupal::logger('aes')->warning("A custom cipher was defined when encrypting a string in the AES module using the phpseclib implementation. This implementation doesn't support custom ciphers therefore the argument was ignored and the encryption was done with the standard cipher.");
     }
     if (is_null($custom_iv) == FALSE) {
-      watchdog("aes", "A custom IV was defined when encrypting a string in the AES module using the phpseclib implementation. This implementation doesn't support custom IV's therefore the argument was ignored and the encryption was done with the standard IV.", array(), WATCHDOG_WARNING);
+      \Drupal::logger('aes')->warning("A custom IV was defined when encrypting a string in the AES module using the phpseclib implementation. This implementation doesn't support custom IV's therefore the argument was ignored and the encryption was done with the standard IV.");
     }
 
     aes_load_phpsec();
@@ -366,7 +364,7 @@ function aes_encrypt($string, $base64encode = TRUE, $custom_key = NULL, $custom_
       if (empty($iv)) {
         aes_make_iv();
         $iv = base64_decode($config->get("mcrypt_iv"));
-        watchdog("aes", "No initialization vector found while trying to encrypt! This could be a bit of a pain since you might have to reset all the passwords for all users. I've created a new one now and will try to carry on as normal.", array(), WATCHDOG_WARNING);
+        \Drupal::logger('aes')->warning("No initialization vector found while trying to encrypt! This could be a bit of a pain since you might have to reset all the passwords for all users. I've created a new one now and will try to carry on as normal.");
       }
 
       $ks = mcrypt_enc_get_key_size($td);
@@ -385,7 +383,7 @@ function aes_encrypt($string, $base64encode = TRUE, $custom_key = NULL, $custom_
       if (user_access('administer aes')) {
         drupal_set_message($error_msg, "error");
       }
-      watchdog("aes", $error_msg, array(), WATCHDOG_ERROR);
+      \Drupal::logger('aes')->error($error_msg);
       return FALSE;
     }
   }
@@ -422,7 +420,7 @@ function aes_decrypt($string, $base64encoded = TRUE, $custom_key = NULL, $custom
 
   // Bail out if the passed string is empty.
   if (empty($string)) {
-    watchdog("aes", "Tried to decrypt an empty string.", array(), WATCHDOG_WARNING);
+    \Drupal::logger('aes')->warning("Tried to decrypt an empty string.");
     return FALSE;
   }
 
@@ -456,10 +454,10 @@ function aes_decrypt($string, $base64encoded = TRUE, $custom_key = NULL, $custom
 
     // phpseclib doesn't support custom ciphers and iv's.
     if (is_null($custom_cipher) == FALSE) {
-      watchdog("aes", "A custom cipher was defined when decrypting a string in the AES module using the phpseclib implementation. This implementation doesn't support custom ciphers therefore the argument was ignored and the decryption was done with the standard cipher.", array(), WATCHDOG_WARNING);
+      \Drupal::logger('aes')->warning("A custom cipher was defined when decrypting a string in the AES module using the phpseclib implementation. This implementation doesn't support custom ciphers therefore the argument was ignored and the decryption was done with the standard cipher.");
     }
     if (is_null($custom_iv) == FALSE) {
-      watchdog("aes", "A custom IV was defined when decrypting a string in the AES module using the phpseclib implementation. This implementation doesn't support custom IV's therefore the argument was ignored and the decryption was done with the standard IV.", array(), WATCHDOG_WARNING);
+      \Drupal::logger('aes')->warning("A custom IV was defined when decrypting a string in the AES module using the phpseclib implementation. This implementation doesn't support custom IV's therefore the argument was ignored and the decryption was done with the standard IV.");
     }
 
     aes_load_phpsec();
@@ -482,7 +480,7 @@ function aes_decrypt($string, $base64encoded = TRUE, $custom_key = NULL, $custom
       }
 
       if (empty($iv)) {
-        watchdog("aes", "No initialization vector found while trying to decrypt. Aborting!", array(), WATCHDOG_ERROR);
+        \Drupal::logger('aes')->error("No initialization vector found while trying to decrypt. Aborting!");
       }
 
       $key = substr(sha1($key), 0, $ks);
@@ -500,7 +498,7 @@ function aes_decrypt($string, $base64encoded = TRUE, $custom_key = NULL, $custom
       if (user_access('administer aes')) {
         drupal_set_message($error_msg, "error");
       }
-      watchdog("aes", $error_msg, array(), WATCHDOG_ERROR);
+      \Drupal::logger('aes')->error($error_msg);
       return FALSE;
     }
   }

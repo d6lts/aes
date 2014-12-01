@@ -135,6 +135,7 @@ class AesAdminForm extends ConfigFormBase {
    * {@inheritdoc}
    */
   public function submitForm(array &$form, FormStateInterface $form_state) {
+    \Drupal::logger('aes')->notice('Saving config...');
     drupal_set_message(t('BLAH!!.'));
     aes_config_submit($form, $form_state);
   }

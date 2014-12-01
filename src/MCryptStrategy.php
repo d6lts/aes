@@ -39,7 +39,7 @@ class MCryptStrategy extends ACrypt {
   public function encrypt($string) {
 
     if (empty($string)) {
-      watchdog("aes", "Tried to encrypt an empty string.", array(), WATCHDOG_WARNING);
+      \Drupal::logger('aes')->warning("Tried to encrypt an empty string.");
       return false;
     }
 
@@ -55,7 +55,7 @@ class MCryptStrategy extends ACrypt {
     /*if (empty($iv)) {
       aes_make_iv();
       $iv = base64_decode($config->get("mcrypt_iv"));
-      watchdog("aes", "No initialization vector found while trying to encrypt! This could be a bit of a pain since you might have to reset all the passwords for all users. I've created a new one now and will try to carry on as normal.", array(), WATCHDOG_WARNING);
+      \Drupal::logger('aes')->warning("No initialization vector found while trying to encrypt! This could be a bit of a pain since you might have to reset all the passwords for all users. I've created a new one now and will try to carry on as normal.");
     }*/
 
     $key = isset($this->_customData['key'])
@@ -79,7 +79,7 @@ class MCryptStrategy extends ACrypt {
 
     }
     catch(Exception $e) {
-      watchdog('BLABLA');
+      \Drupal::logger('aes')->error("Exception: " . $e->getMessage());
       return FALSE;
     }
   }
