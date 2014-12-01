@@ -11,18 +11,6 @@ define("CRYPT_AES_MODE", 1);
 
 use Drupal\Core\Form\FormStateInterface;
 
-/**
- * Implements hook_permission().
- */
-function aes_permission() {
-  return array(
-    'administer aes' => array(
-      'title' => t('Administer AES'),
-      'description' => t('Administer AES module.'),
-    ),
-  );
-}
-
 function aes_load_phpsec() {
 
   // Find out where this module is located and set up an include path for the phpsec library.
