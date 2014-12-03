@@ -324,7 +324,9 @@ function aes_config_submit($form, &$form_state) {
         ))
         ->execute();
     }
-    drupal_set_message(t("Updated the passwords of @updates_num users because of a change in cipher.", array('@updates_num' => $updates_num)));
+    if ($updates_num) {
+      drupal_set_message(t("Updated the passwords of @updates_num users because of a change in cipher.", array('@updates_num' => $updates_num)));
+    }
   }
 
   // If the key has changed...
@@ -356,7 +358,9 @@ function aes_config_submit($form, &$form_state) {
         ->execute();
     }
 
-    drupal_set_message(t("Updated the passwords of @updates_num users because of a change in key.", array('@updates_num' => $updates_num)));
+    if ($updates_num) {
+      drupal_set_message(t("Updated the passwords of @updates_num users because of a change in key.", array('@updates_num' => $updates_num)));
+    }
 
   }
 
@@ -365,10 +369,10 @@ function aes_config_submit($form, &$form_state) {
 
     drupal_set_message(t("Implementation changed. Re-encrypting all passwords using new implementation."));
 
-    $a = db_query("SELECT uid, pass FROM {aes_passwords} WHERE uid != :uid", array(':uid' => 0));
+    $result = db_query("SELECT uid, pass FROM {aes_passwords} WHERE uid != :uid", array(':uid' => 0));
 
     $updates_num = 0;
-    foreach ($a as $user) {
+    foreach ($result as $user) {
       $plain_pass = aes_decrypt($user->pass);
       $new_pass = aes_encrypt($plain_pass, TRUE, NULL, NULL, NULL, $form_state['values']['aes_implementation']);
       $updates_num++;
@@ -381,7 +385,9 @@ function aes_config_submit($form, &$form_state) {
         ->execute();
     }
 
-    drupal_set_message(t("Updated the passwords of @updates_num users because of a change in implementation.", array('@updates_num' => $updates_num)));
+    if ($updates_num) {
+      drupal_set_message(t("Updated the passwords of @updates_num users because of a change in implementation.", array('@updates_num' => $updates_num)));
+    }
 
     variable_set("aes_implementation", $form_state['values']['aes_implementation']);
 
