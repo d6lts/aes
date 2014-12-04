@@ -77,7 +77,8 @@ class AesAdminForm extends ConfigFormBase {
 
     if (empty($encryption_implementations)) {
       $encryption_implementations = array(t('None!'));
-      drupal_set_message(t("You do not have an AES implementation installed!"), "error");
+      drupal_set_message(t("You do not have an AES implementation installed! For correct AES work you need an encryption library, like PhpSecLib or MCrypt. Consult REAMDE.txt for more details."), "error");
+      return array();
     }
 
     $form['aes']['aes_implementation'] = array(
@@ -113,14 +114,18 @@ class AesAdminForm extends ConfigFormBase {
     );
 
     $form['aes']['aes_key'] = array(
-      '#type' => 'password',
+      '#type' => 'textfield',
       '#title' => t('Key'),
       '#description' => t("The key for your encryption system. You normally don't need to worry about this since this module will generate a key for you if none is specified. However you have the option of using your own custom key here."),
+      '#required' => TRUE,
+      '#default_value' => $config->get("key"),
     );
 
     $form['aes']['aes_key_c'] = array(
-      '#type' => 'password',
+      '#type' => 'textfield',
       '#title' => t('Confirm key'),
+      '#required' => TRUE,
+      '#default_value' => $config->get("key"),
     );
 
     $form['aes']['submit'] = array(
@@ -134,9 +139,20 @@ class AesAdminForm extends ConfigFormBase {
   /**
    * {@inheritdoc}
    */
+  public function validateForm(array &$form, FormStateInterface $form_state) {
+    if ($form_state->getValue('aes_key') != $form_state->getValue('aes_key_c')) {
+      $form_state->setErrorByName('aes_key', t("The encryption keys didn't match."));
+    }
+  }
+
+  /**
+   * {@inheritdoc}
+   */
   public function submitForm(array &$form, FormStateInterface $form_state) {
     \Drupal::logger('aes')->notice('Saving config...');
     drupal_set_message(t('BLAH!!.'));
-    aes_config_submit($form, $form_state);
+    $config = $this->config('aes.settings');
+
+    aes_config_submit($form, $form_state, $config);
   }
 }

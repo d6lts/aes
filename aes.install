@@ -47,13 +47,11 @@ function aes_get_available_aes_implementations() {
     $phpsec_include_path = libraries_get_path('phpseclib');
     set_include_path(get_include_path() . PATH_SEPARATOR . $phpsec_include_path);
     $phpsec_available = TRUE;
-    if (!file_exists($phpsec_include_path . '/Crypt/AES.php') === FALSE) {
+    if (!file_exists($phpsec_include_path . '/Crypt/AES.php')) {
       $phpsec_available = FALSE;
     }
-    else {
-      if (is_readable($phpsec_include_path . '/Crypt/AES.php') === FALSE) {
-        $phpsec_available = FALSE;
-      }
+    elseif (!is_readable($phpsec_include_path . '/Crypt/AES.php')) {
+      $phpsec_available = FALSE;
     }
   }
 
