@@ -81,7 +81,7 @@ class AesAdminForm extends ConfigFormBase {
       return array();
     }
 
-    $form['aes']['aes_implementation'] = array(
+    $form['aes']['implementation'] = array(
       '#type' => 'select',
       '#title' => t('AES implementation'),
       '#options' => $encryption_implementations,
@@ -100,7 +100,7 @@ class AesAdminForm extends ConfigFormBase {
       $cipher_description = "";
     }
 
-    $form['aes']['aes_cipher'] = array(
+    $form['aes']['cipher'] = array(
       '#type' => 'select',
       '#title' => t('Cipher'),
       '#options' => array(
@@ -113,7 +113,7 @@ class AesAdminForm extends ConfigFormBase {
       '#description' => $cipher_description,
     );
 
-    $form['aes']['aes_key'] = array(
+    $form['aes']['key'] = array(
       '#type' => 'textfield',
       '#title' => t('Key'),
       '#description' => t("The key for your encryption system. You normally don't need to worry about this since this module will generate a key for you if none is specified. However you have the option of using your own custom key here."),
@@ -121,7 +121,7 @@ class AesAdminForm extends ConfigFormBase {
       '#default_value' => $config->get("key"),
     );
 
-    $form['aes']['aes_key_c'] = array(
+    $form['aes']['key_confirm'] = array(
       '#type' => 'textfield',
       '#title' => t('Confirm key'),
       '#required' => TRUE,
@@ -140,8 +140,8 @@ class AesAdminForm extends ConfigFormBase {
    * {@inheritdoc}
    */
   public function validateForm(array &$form, FormStateInterface $form_state) {
-    if ($form_state->getValue('aes_key') != $form_state->getValue('aes_key_c')) {
-      $form_state->setErrorByName('aes_key', t("The encryption keys didn't match."));
+    if ($form_state->getValue('key') != $form_state->getValue('key_confirm')) {
+      $form_state->setErrorByName('key', t("The encryption keys didn't match."));
     }
   }
 
@@ -150,9 +150,41 @@ class AesAdminForm extends ConfigFormBase {
    */
   public function submitForm(array &$form, FormStateInterface $form_state) {
     \Drupal::logger('aes')->notice('Saving config...');
-    drupal_set_message(t('BLAH!!.'));
     $config = $this->config('aes.settings');
 
-    aes_config_submit($form, $form_state, $config);
+    // If the cipher has changed...
+    $old_cipher = $config->get("cipher");
+    $new_cipher = $form_state->getValue("cipher");
+    if ($form_state->getValue('cipher') != $config->get("cipher")) {
+      $config->set("cipher", $form_state->getValue('cipher'))->save();
+
+      // Get the old iv.
+      $old_iv = $config->get("mcrypt_iv");
+      // create a new iv to match the new cipher
+      aes_make_iv();
+      // get the new iv
+      $new_iv = $config->get("mcrypt_iv");
+    }
+
+    // If the key has changed...
+    if ($form_state->getValue("key") != $config->get("key")) {
+      $config->set("key", $form_state->getValue("key"))->save();
+
+      drupal_set_message(t("Key changed."));
+      // @todo: invoke hook?
+    }
+
+    // If the implementation has changed...
+    if ($form_state->getValue("implementation") != $config->get("implementation")) {
+
+      $config->set("implementation", $form_state->getValue("implementation"))->save();
+
+      if ($form_state->getValue("implementation") == "phpseclib") {
+        // If we have switched to phpseclib implementation, set the cipher to 128, since it's the only one phpseclib supports.
+        $config->set("cipher", "rijndael-128")->save();
+        // Create a new IV, this IV won't actually be used by phpseclib, but it's needed if the implementation is switched back to mcrypt.
+        aes_make_iv(TRUE);
+      }
+    }
   }
 }

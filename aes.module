@@ -11,6 +11,10 @@ define("CRYPT_AES_MODE", 1);
 
 use Drupal\Core\Form\FormStateInterface;
 
+/**
+ * Load PHPSecLib files.
+ * @return bool loading result
+ */
 function aes_load_phpsec() {
 
   // Find out where this module is located and set up an include path for the phpsec library.
@@ -18,90 +22,30 @@ function aes_load_phpsec() {
     $phpsec_include_path = libraries_get_path('phpseclib');
   }
   else {
-    return -4;
+    drupal_set_message(t("The Libraries module should be installed and phpseclib installed as library."), "warning");
+    return FALSE;
   }
 
   // Include phpsec AES lib.
-  if (file_exists($phpsec_include_path . '/Crypt/AES.php') === FALSE) {
-    return -2;
+  if (!file_exists($phpsec_include_path . '/Crypt/AES.php')) {
+    drupal_set_message(t("Cannot load /Crypt/AES.php from phpseclib root."), "warning");
+    return FALSE;
   }
-  if (is_readable($phpsec_include_path . '/Crypt/AES.php') === FALSE) {
-    drupal_set_message(t("It appears that phpseclib is installed in the right location but can't be read. Check that the permissions on the directory and its files allows for reading by the webserver."));
-    return -3;
+  if (!is_readable($phpsec_include_path . '/Crypt/AES.php')) {
+    drupal_set_message(t("It appears that phpseclib is installed in the right location but can't be read. Check that the permissions on the directory and its files allows for reading by the webserver."), "warning");
+    return FALSE;
   }
-  if (function_exists("set_include_path") == FALSE) {
-    // If we don't have set_include_path then we're out of luck.
-    return -1;
+  if (!function_exists("set_include_path")) {
+    drupal_set_message(t("The set_include_path function is inaccessible."), "warning");
+    return FALSE;
   }
   set_include_path(get_include_path() . PATH_SEPARATOR . $phpsec_include_path);
   include_once('Crypt/AES.php');
   return TRUE;
 }
 
-// @TODO: migrate!!!
-/**
- * @param $form
- * @param FormStateInterface $form_state
- *
- * @todo: invoke own hook to notify about key change
- */
-function aes_config_submit($form, $form_state, $config) {
-//  FormStateInterface;
-  var_dump($form_state->getValue('aes_cipher'));
-
-
-  // If the cipher has changed...
-  $old = $config->get("cipher");
-  $new = $form_state->getValue('aes_cipher');
-  if ($form_state->getValue('aes_cipher') != $config->get("cipher")) {
-    $old_cipher = $config->get("cipher");
-    $config->set("cipher", $form_state->getValue('aes_cipher'));
-    $new_cipher = $form_state->getValue('aes_cipher');
-
-    // Get the old iv.
-    $old_iv = $config->get("mcrypt_iv");
-    // update the cipher the system uses
-    $config->set("cipher", $form_state->getValue('aes_cipher'));
-    // create a new iv to match the new cipher
-    aes_make_iv();
-    // get the new iv
-    $new_iv = $config->get("mcrypt_iv");
-  }
-
-  // If the key has changed...
-  $new_key = $form_state->getValue('aes_key');
-  if (!empty($new_key)) {
-    $old_key = aes_get_key();
-    $config->set('key', $new_key);
-
-    drupal_set_message(t("Key changed."));
-    // @todo: invoke hook?
-  }
-
-  // If the implementation has changed...
-  if ($form_state->getValue('aes_implementation') != $config->get("implementation")) {
-
-    $config->set("implementation", $form_state->getValue('aes_implementation'));
-
-    if ($form_state->getValue('aes_implementation') == "phpseclib") {
-      // If we have switched to phpseclib implementation, set the cipher to 128, since it's the only one phpseclib supports.
-      $config->set("cipher", "rijndael-128");
-      // Create a new IV, this IV won't actually be used by phpseclib, but it's needed if the implementation is switched back to mcrypt.
-      aes_make_iv(TRUE);
-    }
-  }
-  $r = $config->save();
-  var_dump($r);
-}
-
 function aes_get_key() {
-  $key = \Drupal::config('aes.settings')->get("key");
-  if (empty($key)) {
-    $key = aes_make_key();
-    \Drupal::config('aes.settings')->set("key", $key)->save();
-    \Drupal::logger('aes')->notice("AES module made a new key since one couldn't be found.");
-  }
-  return $key;
+  return \Drupal::config('aes.settings')->get("key");
 }
 
 function aes_make_key() {
@@ -228,6 +172,7 @@ function aes_encrypt($string, $base64encode = TRUE, $custom_key = NULL, $custom_
     }
 
     aes_load_phpsec();
+    // @todo: check for error
     $phpsec = new Crypt_AES();
     $phpsec->setKey($key);
     $encrypted = $phpsec->encrypt($string);
@@ -345,6 +290,7 @@ function aes_decrypt($string, $base64encoded = TRUE, $custom_key = NULL, $custom
     }
 
     aes_load_phpsec();
+    // @todo: check for error
     $phpsec = new Crypt_AES();
     $phpsec->setKey($key);
     $decrypted = $phpsec->decrypt($string);
