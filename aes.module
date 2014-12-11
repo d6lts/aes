@@ -293,37 +293,94 @@ function aes_config_submit($form, &$form_state) {
     aes_store_key($key);
   }
 
-  // Re-encrypt user passwords if the cipher, key or implementation have been
-  // changed.
-  // 
-  // Note: the reason we are calling the function three times and using separate
-  // if statements, is to re-encrypt the passwords in the same order and
-  // make it possible to re-encrypt several times if necessary (depending on
-  // which settings have been changed).
+  // To use if re-encryption is required.
+  $decrypt_params = array(
+    'string' => '',
+    'base64encoded' => TRUE,
+    'custom_key' => aes_get_key(),
+    'custom_cipher' => variable_get("aes_cipher", "rijndael-128"),
+    'custom_iv' => variable_get("aes_encryption_iv", ""),
+    'custom_implementation' => variable_get("aes_implementation", "mcrypt"),
+  );
+  $encrypt_params = array(
+    'string' => '',
+    'base64encode' => TRUE,
+    'custom_key' => NULL,
+    'custom_cipher' => NULL,
+    'custom_iv' => NULL,
+    'custom_implementation' => NULL,
+  );
+  $do_reencypt = FALSE;
+  // If the cipher has changed...
+  if ($form_state['values']['aes_cipher'] != variable_get("aes_cipher", "rijndael-128")) {
+    variable_set("aes_cipher", $form_state['values']['aes_cipher']);
+    $new_cipher = $form_state['values']['aes_cipher'];
 
-  // Check if the encryption cipher has been changed.
-  if ($form_state['values']['aes_cipher'] != variable_get('aes_cipher', 'rijndael-128')) {
-    _aes_reencrypt_user_passwords(array(
-      'changed_setting' => 'cipher',
-      'new_cipher' => $form_state['values']['aes_cipher'],
-    ));
+    // update the cipher the system uses
+    variable_set("aes_cipher", $form_state['values']['aes_cipher']);
+    // Create a new iv to match the new cipher.
+    aes_make_iv();
+
+    $encrypt_params['custom_cipher'] = $new_cipher;
+    $encrypt_params['custom_iv'] = variable_get("aes_encryption_iv");
+    $do_reencypt = TRUE;
+    drupal_set_message(t("Cipher changed."));
   }
-  // Check if the encryption key has been changed.
+
+  // If the key has changed...
   if (!empty($form_state['values']['aes_key'])) {
-    _aes_reencrypt_user_passwords(array(
-      'changed_setting' => 'key',
-      'new_key' => $form_state['values']['aes_key'],
-    ));
+    if (!aes_store_key($form_state['values']['aes_key'])) {
+      drupal_set_message(t("Failed to write new encryption key! Aborting."));
+      return;
+    }
+
+    $encrypt_params['custom_key'] = $form_state['values']['aes_key'];
+    $do_reencypt = TRUE;
+    drupal_set_message(t("Key changed."));
   }
-  // Check if the implementation has been changed.
-  if ($form_state['values']['aes_implementation'] != variable_get('aes_implementation', 'mcrypt')) {
-    _aes_reencrypt_user_passwords(array(
-      'changed_setting' => 'implementation',
-      'implementation' => $form_state['values']['aes_implementation'],
-    ));
+
+  // If the implementation has changed...
+  if ($form_state['values']['aes_implementation'] != variable_get("aes_implementation", "mcrypt")) {
+    variable_set("aes_implementation", $form_state['values']['aes_implementation']);
+    $encrypt_params['custom_implementation'] = $form_state['values']['aes_implementation'];
+    $do_reencypt = TRUE;
+
+    if ($form_state['values']['aes_implementation'] == "phpseclib") {
+      // If we have switched to phpseclib implementation, set the cipher to 128, since it's the only one phpseclib supports.
+      variable_set("aes_cipher", "rijndael-128");
+      $encrypt_params['custom_cipher'] = "rijndael-128";
+      // Create a new IV, this IV won't actually be used by phpseclib, but it's needed if the implementation is switched back to mcrypt.
+      aes_make_iv(TRUE);
+      $encrypt_params['custom_iv'] = variable_get("aes_encryption_iv");
+    }
+    drupal_set_message(t("Implementation changed."));
+  }
+
+  if ($do_reencypt) {
+    $accounts = db_select('aes_passwords', 'p')
+      ->fields('p', array('uid', 'pass'))
+      ->condition('uid', 0, '!=')
+      ->execute()
+      ->fetchAll();
+    foreach ($accounts as $account) {
+      $decrypt_params['string'] = $account->pass;
+      $plain_pass = call_user_func_array('aes_decrypt', $decrypt_params);
+      $encrypt_params['string'] = $plain_pass;
+      $new_pass = call_user_func_array('aes_encrypt', $encrypt_params);
+      db_update('aes_passwords')
+        ->fields(array('pass' => $new_pass))
+        ->where("uid = :uid", array(
+          ':uid' => $account->uid,
+        ))
+        ->execute();
+    }
+    if (count($accounts)) {
+      drupal_set_message(t("Updated the passwords of @updates_num users because of a change in encryption settings.", array('@updates_num' => count($accounts))));
+    }
   }
 
   variable_set("aes_viewing_method", $form_state['values']['view_method']);
+
 }
 
 /**
@@ -640,7 +697,7 @@ function aes_encrypt($string, $base64encode = TRUE, $custom_key = NULL, $custom_
     $key = aes_get_key();
   }
 
-  if (is_null($custom_implementation) == FALSE && ($custom_implementation == "mcrypt" || $custom_implementation == "phpseclib")) {
+  if ($custom_implementation == "mcrypt" || $custom_implementation == "phpseclib") {
     $implementation = $custom_implementation;
   }
   else {
@@ -756,7 +813,7 @@ function aes_decrypt($string, $base64encoded = TRUE, $custom_key = NULL, $custom
     $key = aes_get_key();
   }
 
-  if (is_null($custom_implementation) == FALSE && ($custom_implementation == "mcrypt" || $custom_implementation == "phpseclib")) {
+  if ($custom_implementation == "mcrypt" || $custom_implementation == "phpseclib") {
     $implementation = $custom_implementation;
   }
   else {
@@ -864,86 +921,4 @@ function mcrypt_module_open_safe($algorithm, $algorithm_directory, $mode, $mode_
     throw new Exception('AES: Mcrypt is selected as encryption implementation but is unavailable.');
   }
   return mcrypt_module_open($algorithm, $algorithm_directory, $mode, $mode_directory);
-}
-
-/**
- * Helper function - update user passwords after a setting has been changed.
- */
-function _aes_reencrypt_user_passwords($options = array()) {
-  // Sanity check.
-  if (!isset($options['changed_setting'])) return;
-  // Get all the users with AES encrypted passwords.
-  $accounts = db_select('aes_passwords', 'p')
-    ->fields('p', array('uid', 'pass'))
-    ->condition('uid', 0, '!=')
-    ->execute()
-    ->fetchAll();
-
-  // Prepare necessary variables that will be used for re-encrypting user
-  // passwords. The reason we do it here is to minimize the overhead and avoid
-  // calling these functions for each user in the foreach loop below.
-  switch ($options['changed_setting']) {
-    // The cipher has been changed.
-    case 'cipher':
-      // Replace the cipher in the database.
-      $old_cipher = variable_get('aes_cipher', 'rijndael-128');
-      variable_set('aes_cipher', $options['new_cipher']);
-      // Get the old iv.
-      $old_iv = variable_get('aes_encryption_iv', '');
-      // create a new iv to match the new cipher
-      aes_make_iv();
-      // get the new iv
-      $new_iv = variable_get('aes_encryption_iv', '');
-      break;
-
-    // The key has been changed.
-    case 'key':
-      $old_key = aes_get_key();
-      $new_key = aes_store_key($options['new_key']);
-      if ($new_key === FALSE) {
-        drupal_set_message(t('Failed to write new encryption key! Aborting.'));
-        return;
-      }
-      drupal_set_message(t('AES key has been changed successfully.'));
-      break;
-
-    // Implementation has been changed.
-    case 'implementation':
-      // Nothing else is necessary, just show the message to the admin.
-      drupal_set_message(t('Implementation changed. Re-encrypting all passwords using new implementation.'));
-      break;
-  }
-
-  // Act only if some accounts are about to be affected.
-  if (count($accounts)) {
-    // Loop through the results and update their passwords.
-    foreach ($accounts as $account) {
-      // Option-specific code.
-      switch ($options['changed_setting']) {
-        case 'cipher':
-          // Get user password.
-          $plain_pass = aes_decrypt($account->pass, TRUE, NULL, $old_cipher, $old_iv);
-          $new_pass   = aes_encrypt($plain_pass, TRUE, NULL, $options['new_cipher'], $new_iv);
-          break;
-        case 'key':
-          $plain_pass = aes_decrypt($account->pass, TRUE, $old_key);
-          $new_pass   = aes_encrypt($plain_pass, TRUE, $new_key);
-          break;
-        case 'implementation':
-          $plain_pass = aes_decrypt($user->pass);
-          $new_pass = aes_encrypt($plain_pass, TRUE, NULL, NULL, NULL, $options['implementation']);
-          break;
-      }
-      // Finally, update the encrypted password in the database.
-      db_update('aes_passwords')
-        ->fields(array('pass' => $new_pass))
-        ->condition('uid', $account->uid)
-        ->execute();
-    }
-    // Show the success message to the administrator with the user count.
-    drupal_set_message(t('Updated the passwords of @user_count users because of a change in @setting.', array(
-      '@user_count' => count($accounts),
-      '@setting' => $options['changed_setting'],
-    )));
-  }
 }
