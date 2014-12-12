@@ -7,108 +7,120 @@
  */
 
 // Set phpseclib to use its internal implementation even if mcrypt is available.
-define("CRYPT_AES_MODE", 1);
-
-use Drupal\Core\Form\FormStateInterface;
+define('CRYPT_AES_MODE', 1);
 
 /**
  * Load PHPSecLib files.
+ *
+ * @param bool $display_errors
+ *   In case of problem with loading library, display errors and warnings.
+ *
  * @return bool loading result
  */
-function aes_load_phpsec() {
-
-  // Find out where this module is located and set up an include path for the phpsec library.
-  if (\Drupal::moduleHandler()->moduleExists('libraries') && libraries_get_path('phpseclib')) {
-    $phpsec_include_path = libraries_get_path('phpseclib');
+function aes_load_phpsec($display_errors = TRUE) {
+  $library_error = FALSE;
+  if (!\Drupal::moduleHandler()->moduleExists('libraries')) {
+    $library_error = t('The Libraries module should be enabled to use phpseclib.');
   }
-  else {
-    drupal_set_message(t("The Libraries module should be installed and phpseclib installed as library."), "warning");
+  elseif (($phpsec_include_path = libraries_get_path('phpseclib')) == FALSE) {
+    $library_error = t('The phpseclib package should be installed as a library.');
+  }
+  elseif (!file_exists($phpsec_include_path . '/Crypt/AES.php')) {
+    $library_error = t('Cannot load /Crypt/AES.php from phpseclib root.');
+  }
+  elseif (!is_readable($phpsec_include_path . '/Crypt/AES.php')) {
+    $library_error = t("It appears that phpseclib is installed in the right location but can't be read. Check that the permissions on the directory and its files allows for reading by the webserver.");
+  }
+  elseif (!function_exists('set_include_path')) {
+    $library_error = t('The set_include_path function is inaccessible.');
+  }
+
+  if ($library_error) {
+    if ($display_errors) {
+      drupal_set_message($library_error, 'warning');
+    }
     return FALSE;
   }
 
   // Include phpsec AES lib.
-  if (!file_exists($phpsec_include_path . '/Crypt/AES.php')) {
-    drupal_set_message(t("Cannot load /Crypt/AES.php from phpseclib root."), "warning");
-    return FALSE;
-  }
-  if (!is_readable($phpsec_include_path . '/Crypt/AES.php')) {
-    drupal_set_message(t("It appears that phpseclib is installed in the right location but can't be read. Check that the permissions on the directory and its files allows for reading by the webserver."), "warning");
-    return FALSE;
-  }
-  if (!function_exists("set_include_path")) {
-    drupal_set_message(t("The set_include_path function is inaccessible."), "warning");
-    return FALSE;
-  }
   set_include_path(get_include_path() . PATH_SEPARATOR . $phpsec_include_path);
   include_once('Crypt/AES.php');
-  return TRUE;
-}
-
-function aes_get_key() {
-  return \Drupal::config('aes.settings')->get("key");
-}
-
-function aes_make_key() {
-
-  $acceptable = FALSE;
-
-  $chars = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ1234567890";
-
-  while ($acceptable === FALSE) {
-
-    $key = "";
-
-    while (strlen($key) < 32) {
-      $key .= substr($chars, rand(0, strlen($chars)), 1);
-    }
-
-    $acceptable = TRUE;
-
-    // is there at least one lowercase letter?
-    $result = preg_match("/.*[a-z].*/", $key);
-
-    if ($result == 0) {
-      $acceptable = FALSE;
-    }
-
-    // is there at least one uppercase letter?
-    $result = preg_match("/.*[A-Z].*/", $key);
-
-    if ($result == 0) {
-      $acceptable = FALSE;
-    }
-
-    // is there at least one numeric?
-    $result = preg_match("/.*[0-9].*/", $key);
-
-    if ($result == 0) {
-      $acceptable = FALSE;
-    }
+  if (class_exists('Crypt_AES')) {
+    return TRUE;
   }
 
+  if ($display_errors) {
+    drupal_set_message('Including library error', 'error');
+  }
+  return FALSE;
+}
+
+/**
+ * Retrieve encryption key.
+ *
+ * @return string encryption key.
+ */
+function aes_get_key() {
+  //return \Drupal::config('aes.settings')->get('key');
+  $config = \Drupal\Core\Config\FileStorageFactory::getActive()->read('aes.settings');
+  return $config['key'];
+}
+
+/**
+ * Generate a random key, containing uppercase, lowercase and digits.
+ *
+ * @return string encryption key.
+ */
+function aes_make_key() {
+  $keylen = 32;
+  $chars = 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ1234567890';
+  while (TRUE) {
+    $key = '';
+    while (strlen($key) < $keylen) {
+      $key .= substr($chars, rand(0, strlen($chars)), 1);
+    }
+    // is there at least one lowercase letter?
+    if (!preg_match('/.*[a-z].*/', $key)) {
+      continue;
+    }
+    // is there at least one uppercase letter?
+    if (!preg_match('/.*[A-Z].*/', $key)) {
+      continue;
+    }
+    // is there at least one numeric?
+    if (!preg_match('/.*[0-9].*/', $key)) {
+      continue;
+    }
+    break;
+  }
+  \Drupal::logger('aes')->notice('Generated new AES key: ' . substr($key, 0, 4) . str_repeat('*', $keylen - 8) . substr($key, $keylen - 4, 4));
   return $key;
 }
 
+/**
+ * Generate an IV - initialization vector - and store it in configuration.
+ *
+ * @param bool $ignore_implementation
+ */
 function aes_make_iv($ignore_implementation = FALSE) {
-  $config = \Drupal::config('aes.settings');
+  $config = \Drupal\Core\Config\FileStorageFactory::getActive()->read('aes.settings');
 
   // Bail out if using phpseclib
-  if ($config->get("implementation") == "phpseclib" && $ignore_implementation == FALSE) {
+  if ($config['implementation'] == 'phpseclib' && $ignore_implementation == FALSE) {
     \Drupal::logger('aes')->warning("Called aes_make_iv when using phpseclib. This is harmless, but shouldn't happen.");
     return;
   }
 
-  if (strtoupper(substr(PHP_OS, 0, 3)) === "WIN") {
-    $randgen = MCRYPT_RAND;
+  $randgen = (strtoupper(substr(PHP_OS, 0, 3)) === 'WIN') ? MCRYPT_RAND : MCRYPT_DEV_URANDOM;
+  $cryptor = mcrypt_module_open($config['cipher'], '', MCRYPT_MODE_CBC, '');
+  if (!$cryptor) {
+    \Drupal::logger('aes')->warning(t('Problem while calling mcrypt_module_open for cipher %cipher.'), array('%cipher' => $config['cipher']));
+    return;
   }
-  else {
-    $randgen = MCRYPT_DEV_URANDOM;
-  }
-
-  $td = mcrypt_module_open($config->get("cipher"), "", MCRYPT_MODE_CBC, "");
-  $iv = mcrypt_create_iv(mcrypt_enc_get_iv_size($td), $randgen);
-  mcrypt_module_close($td);
-  $config->set("mcrypt_iv", base64_encode($iv))->save();
+  $iv = mcrypt_create_iv(mcrypt_enc_get_iv_size($cryptor), $randgen);
+  mcrypt_module_close($cryptor);
+  $config['mcrypt_iv'] = base64_encode($iv);
+  \Drupal\Core\Config\FileStorageFactory::getActive()->write('aes.settings', $config);
 }
 
 /**
@@ -125,66 +137,56 @@ function aes_make_iv($ignore_implementation = FALSE) {
  * @param string $custom_iv
  *   Use this initialization vector instead of the default one.
  * @param string $force_implementation
- *   Can be "phpseclib" or "mcrypt". Warning: Does not check if the requested implementation actually exists.
+ *   Can be 'phpseclib' or 'mcrypt'. Warning: Does not check if the requested implementation actually exists.
  *
  * @return bool|string
  *   The encrypted string on success, false on error.
  */
 function aes_encrypt($string, $base64encode = TRUE, $custom_key = NULL, $custom_cipher = NULL, $custom_iv = NULL, $force_implementation = NULL) {
-  $config = \Drupal::config('aes.settings');
-
   // Bail out if the passed string is empty.
   if (empty($string)) {
-    \Drupal::logger('aes')->warning("Tried to encrypt an empty string.");
+    \Drupal::logger('aes')->warning('Tried to encrypt an empty string.');
     return FALSE;
   }
 
-  if ($custom_cipher != NULL) {
-    $cipher = $custom_cipher;
-  }
-  else {
-    $cipher = $config->get("cipher");
+  $config = \Drupal\Core\Config\FileStorageFactory::getActive()->read('aes.settings');
+  $cipher = empty($custom_cipher) ? $config['cipher'] : $custom_cipher;
+  $key = empty($custom_key) ? aes_get_key() : $custom_key;
+
+  $implementation = $config['implementation'];
+  if ($force_implementation) {
+    if ($force_implementation == 'mcrypt' || $force_implementation == 'phpseclib') {
+      $implementation = $force_implementation;
+    }
+    else {
+      \Drupal::logger('aes')->error('aes_encrypt: call with incorrect $force_implementation parameter: ' . $force_implementation);
+      return FALSE;
+    }
   }
 
-  if (!empty($custom_key)) {
-    $key = $custom_key;
-  }
-  else {
-    $key = aes_get_key();
-  }
-
-  if (is_null($force_implementation) == FALSE && ($force_implementation == "mcrypt" || $force_implementation == "phpseclib")) {
-    $implementation = $force_implementation;
-  }
-  else {
-    $implementation = $config->get("implementation");
-  }
-
-  if ($implementation == "phpseclib") {
-    // Using phpseclib implementation.
-
-    // phpseclib doesn't support custom ciphers and iv's.
-    if (is_null($custom_cipher) == FALSE) {
+  if ($implementation == 'phpseclib') {
+    // The phpseclib doesn't support custom ciphers and iv's.
+    if (!empty($custom_cipher)) {
       \Drupal::logger('aes')->warning("A custom cipher was defined when encrypting a string in the AES module using the phpseclib implementation. This implementation doesn't support custom ciphers therefore the argument was ignored and the encryption was done with the standard cipher.");
     }
-    if (is_null($custom_iv) == FALSE) {
+    if (!empty($custom_iv)) {
       \Drupal::logger('aes')->warning("A custom IV was defined when encrypting a string in the AES module using the phpseclib implementation. This implementation doesn't support custom IV's therefore the argument was ignored and the encryption was done with the standard IV.");
     }
 
-    aes_load_phpsec();
-    // @todo: check for error
+    if (!aes_load_phpsec()) {
+      return FALSE;
+    }
     $phpsec = new Crypt_AES();
     $phpsec->setKey($key);
     $encrypted = $phpsec->encrypt($string);
-
   }
   else {
-    if ($implementation == "mcrypt") {
+    if ($implementation == 'mcrypt') {
       // Using mcrypt implementation.
-      $td = mcrypt_module_open($cipher, "", MCRYPT_MODE_CBC, "");
+      $td = mcrypt_module_open($cipher, '', MCRYPT_MODE_CBC, '');
 
       if ($custom_iv == NULL) {
-        $iv = base64_decode($config->get("mcrypt_iv"));
+        $iv = base64_decode($config['mcrypt_iv']);
       }
       else {
         $iv = base64_decode($custom_iv);
@@ -192,12 +194,12 @@ function aes_encrypt($string, $base64encode = TRUE, $custom_key = NULL, $custom_
 
       if (empty($iv)) {
         aes_make_iv();
-        $iv = base64_decode($config->get("mcrypt_iv"));
-        \Drupal::logger('aes')->warning("No initialization vector found while trying to encrypt! This could be a bit of a pain since you might have to reset all the passwords for all users. I've created a new one now and will try to carry on as normal.");
+        $config = $fileStorage->read('aes.settings');
+        $iv = base64_decode($config['mcrypt_iv']);
+        \Drupal::logger('aes')->warning('No initialization vector found while trying to encrypt! This could be a bit of a pain since you might have to reset all the passwords for all users. Recreated a new one now and will try to carry on as normal.');
       }
 
       $ks = mcrypt_enc_get_key_size($td);
-
       $key = substr(sha1($key), 0, $ks);
 
       mcrypt_generic_init($td, $key, $iv);
@@ -207,22 +209,16 @@ function aes_encrypt($string, $base64encode = TRUE, $custom_key = NULL, $custom_
       mcrypt_module_close($td);
     }
     else {
-      $error_msg = t("Request was sent to encrypt a string with the AES module, but the AES module has no active encryption implementation to work with! Did you forget to run update.php after upgrading this module?");
-
+      $error_msg = t('Request was sent to encrypt a string with the AES module, but the AES module has no active encryption implementation to work with! Did you forget to run update.php after upgrading this module?');
       if (user_access('administer aes')) {
-        drupal_set_message($error_msg, "error");
+        drupal_set_message($error_msg, 'error');
       }
       \Drupal::logger('aes')->error($error_msg);
       return FALSE;
     }
   }
 
-  if ($base64encode) {
-    return base64_encode($encrypted);
-  }
-  else {
-    return $encrypted;
-  }
+  return $base64encode ? base64_encode($encrypted) : $encrypted;
 }
 
 /**
@@ -239,78 +235,69 @@ function aes_encrypt($string, $base64encode = TRUE, $custom_key = NULL, $custom_
  * @param string $custom_iv
  *   Use this initialization vector instead of the default one.
  * @param string $force_implementation
- *   Can be "phpseclib" or "mcrypt". Warning: Does not check if the requested implementation actually exists.
+ *   Can be 'phpseclib' or 'mcrypt'. Warning: Does not check if the requested implementation actually exists.
  *
  * @return bool|string
  *   The decrypted string on success, false on error.
  */
 function aes_decrypt($string, $base64encoded = TRUE, $custom_key = NULL, $custom_cipher = NULL, $custom_iv = NULL, $force_implementation = NULL) {
-  $config = \Drupal::config('aes.settings');
-
   // Bail out if the passed string is empty.
   if (empty($string)) {
-    \Drupal::logger('aes')->warning("Tried to decrypt an empty string.");
+    \Drupal::logger('aes')->warning('Tried to decrypt an empty string.');
     return FALSE;
   }
 
+  $config = \Drupal\Core\Config\FileStorageFactory::getActive()->read('aes.settings');
   if ($base64encoded) {
     $string = base64_decode($string);
   }
 
-  if ($custom_cipher != NULL) {
-    $cipher = $custom_cipher;
-  }
-  else {
-    $cipher = $config->get("cipher");
+  $cipher = empty($custom_cipher) ? $config['cipher'] : $custom_cipher;
+  $key = empty($custom_key) ? aes_get_key() : $custom_key;
+
+  $implementation = $config['implementation'];
+  if ($force_implementation) {
+    if ($force_implementation == 'mcrypt' || $force_implementation == 'phpseclib') {
+      $implementation = $force_implementation;
+    }
+    else {
+      \Drupal::logger('aes')->error('aes_decrypt: call with incorrect $force_implementation parameter: ' . $force_implementation);
+      return FALSE;
+    }
   }
 
-  if (!empty($custom_key)) {
-    $key = $custom_key;
-  }
-  else {
-    $key = aes_get_key();
-  }
-
-  if (is_null($force_implementation) == FALSE && ($force_implementation == "mcrypt" || $force_implementation == "phpseclib")) {
-    $implementation = $force_implementation;
-  }
-  else {
-    $implementation = $config->get("implementation");
-  }
-
-  if ($implementation == "phpseclib") {
-    // Using phpseclib implementation.
-
-    // phpseclib doesn't support custom ciphers and iv's.
-    if (is_null($custom_cipher) == FALSE) {
+  if ($implementation == 'phpseclib') {
+    // The phpseclib doesn't support custom ciphers and iv's.
+    if (!empty($custom_cipher)) {
       \Drupal::logger('aes')->warning("A custom cipher was defined when decrypting a string in the AES module using the phpseclib implementation. This implementation doesn't support custom ciphers therefore the argument was ignored and the decryption was done with the standard cipher.");
     }
-    if (is_null($custom_iv) == FALSE) {
+    if (!empty($custom_iv)) {
       \Drupal::logger('aes')->warning("A custom IV was defined when decrypting a string in the AES module using the phpseclib implementation. This implementation doesn't support custom IV's therefore the argument was ignored and the decryption was done with the standard IV.");
     }
 
-    aes_load_phpsec();
-    // @todo: check for error
+    if (!aes_load_phpsec()) {
+      return FALSE;
+    }
     $phpsec = new Crypt_AES();
     $phpsec->setKey($key);
     $decrypted = $phpsec->decrypt($string);
   }
   else {
-    if ($implementation == "mcrypt") {
+    if ($implementation == 'mcrypt') {
       // Using mcrypt implementation.
 
-      $td = mcrypt_module_open($cipher, "", MCRYPT_MODE_CBC, "");
+      $td = mcrypt_module_open($cipher, '', MCRYPT_MODE_CBC, '');
       $ks = mcrypt_enc_get_key_size($td);
 
       if ($custom_iv == NULL) {
-        $iv = base64_decode($config->get("mcrypt_iv"));
+        $iv = base64_decode($config['mcrypt_iv']);
       }
       else {
         $iv = base64_decode($custom_iv);
       }
 
       if (empty($iv)) {
-        \Drupal::logger('aes')->error("No initialization vector found while trying to decrypt. Aborting!");
+        \Drupal::logger('aes')->error('No initialization vector found while trying to decrypt. Aborting!');
       }
 
       $key = substr(sha1($key), 0, $ks);
@@ -322,11 +309,9 @@ function aes_decrypt($string, $base64encoded = TRUE, $custom_key = NULL, $custom
       mcrypt_module_close($td);
     }
     else {
-
-      $error_msg = t("Request was sent to decrypt a string with the AES module, but the AES module has no active encryption implementation to work with! Did you forget to run update.php after upgrading this module?");
-
+      $error_msg = t('Request was sent to decrypt a string with the AES module, but the AES module has no active encryption implementation to work with! Did you forget to run update.php after upgrading this module?');
       if (user_access('administer aes')) {
-        drupal_set_message($error_msg, "error");
+        drupal_set_message($error_msg, 'error');
       }
       \Drupal::logger('aes')->error($error_msg);
       return FALSE;

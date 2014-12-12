@@ -9,9 +9,6 @@
 namespace Drupal\aes;
 
 use Drupal\Core\Config\ConfigFactoryInterface;
-use SebastianBergmann\Exporter\Exception;
-
-
 use \Doctrine\Common\Util\Debug;
 
 class AesCryptManager implements ICrypt{
@@ -41,13 +38,13 @@ class AesCryptManager implements ICrypt{
     $this->implementation = $this->config->get('implementation');
     //Debug::dump($this->implementation);
     $strategies = $this->getStrategies();
-    $class_name = $strategies[$this->implementation];
+    $class_name = '\\Drupal\\aes\\' . $strategies[$this->implementation];
     if (!class_exists($class_name)) {
       // @todo: log to watchdog
-      throw new Exception("No class found " . $class_name . " for implementation " . $this->implementation);
+      throw new \Exception("No class found $class_name for implementation $this->implementation");
     }
     $this->strategy = new $class_name($this->config);
-    //  Debug::dump($this->strategy);
+    Debug::dump($this->strategy);
 
     // @todo: process aes_get_key()
   }

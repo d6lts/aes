@@ -49,7 +49,7 @@ function aes_get_available_aes_implementations() {
     $phpsec_available = is_readable($phpsec_include_path . '/Crypt/AES.php');
   }
 
-  if (extension_loaded("mcrypt")) {
+  if (extension_loaded('mcrypt')) {
     $mcrypt_available = TRUE;
   }
   else {
@@ -59,50 +59,59 @@ function aes_get_available_aes_implementations() {
   return array('mcrypt' => $mcrypt_available, 'phpseclib' => $phpsec_available);
 }
 
+/**
+ * Implements hook_install().
+ *
+ * Please note - we moving our settings to YAML from default DB storage.
+ */
 function aes_install() {
   $aes_implementations = aes_get_available_aes_implementations();
-
-  $config = \Drupal::config('aes.settings');
-
+  $config_db = \Drupal::config('aes.settings');
   if ($aes_implementations['mcrypt']) {
-    $config->set("implementation", "mcrypt");
-    $install_msg = t("AES installed using the Mcrypt implementation.");
+    $config_db->set('implementation', 'mcrypt');
+    $install_msg = t('AES installed using the Mcrypt implementation.');
   }
   else {
     if ($aes_implementations['phpseclib']) {
-      $config->set("implementation", "phpseclib");
-      $install_msg = t("AES installed using the phpseclib implementation.");
+      $config_db->set('implementation', 'phpseclib');
+      $install_msg = t('AES installed using the phpseclib implementation.');
     }
     else {
       // This case shouldn't actually be possible since hook_requirements should stop the installation if there's no implementation.
-      $config->set("implementation", "missing");
-      $install_msg = t("AES installed without any implementation!");
+      $config_db->set('implementation', 'missing');
+      $install_msg = t('AES installed without any implementation!');
     }
   }
 
-  $config->save();
+  // Copy settings to YAML file storage.
+  $fileStorage = \Drupal\Core\Config\FileStorageFactory::getActive();
+  $fileStorage->write('aes.settings', $config_db->getRawData());
+  // And remove settings from DB.
+  $config_db->initWithData(array('msg' => 'Configuration is stored in setting YAML file.'))->save();
+  $config_files = $fileStorage->read('aes.settings');
   drupal_set_message($install_msg);
 
-  if ($config->get("implementation") == "mcrypt") {
-    $iv = $config->get("mcrypt_iv");
+  if ($config_files['implementation'] == 'mcrypt') {
+    $iv = $config_files['mcrypt_iv'];
     if (empty($iv)) {
       aes_make_iv();
+      $config_files = $fileStorage->read('aes.settings');
     }
   }
 
   // This will create a new key if one doesn't exist.
   if (empty(aes_get_key())) {
     $key = aes_make_key();
-    \Drupal::config('aes.settings')->set("key", $key)->save();
+    $config_files['key'] = $key;
+    $fileStorage->write('aes.settings', $config_files);
     \Drupal::logger('aes')->notice("AES module made a new key since one couldn't be found.");
   }
-
 }
 
 /**
  * Implements hook_uninstall().
  */
 function aes_uninstall() {
-  // @todo: send email to admin.
-  drupal_set_message(t("AES uninstalled."));
+  \Drupal\Core\Config\FileStorageFactory::getActive()->delete('aes.settings');
+  drupal_set_message(t('AES uninstalled.'));
 }

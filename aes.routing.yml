@@ -9,3 +9,5 @@ aes.sample:
   path: '/admin/config/system/aes/test'
   defaults:
     { _controller: \Drupal\aes\Controller\AesController:samplePage }
+  requirements:
+    _permission: 'administer aes'
