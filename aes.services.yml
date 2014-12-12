@@ -1,4 +1,0 @@
-services:
-  aes.crypt:
-    class: Drupal\aes\AesCryptManager
-    arguments: ['@config.factory']
