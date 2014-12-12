@@ -594,42 +594,33 @@ function aes_delete_key($storage_method) {
   }
 }
 
+/**
+ * Generate a random key, containing uppercase, lowercase and digits.
+ *
+ * @return string encryption key.
+ */
 function aes_make_key() {
+  $chars = 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ1234567890';
 
-  $acceptable = FALSE;
-
-  $chars = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ1234567890";
-
-  while ($acceptable === FALSE) {
-
-    $key = "";
-
+  while (TRUE) {
+    $key = '';
     while (strlen($key) < 32) {
       $key .= substr($chars, rand(0, strlen($chars)), 1);
     }
 
-    $acceptable = TRUE;
-
     // is there at least one lowercase letter?
-    $result = preg_match("/.*[a-z].*/", $key);
-
-    if ($result == 0) {
-      $acceptable = FALSE;
+    if (!preg_match('/.*[a-z].*/', $key)) {
+      continue;
     }
-
     // is there at least one uppercase letter?
-    $result = preg_match("/.*[A-Z].*/", $key);
-
-    if ($result == 0) {
-      $acceptable = FALSE;
+    if (!preg_match('/.*[A-Z].*/', $key)) {
+      continue;
     }
-
     // is there at least one numeric?
-    $result = preg_match("/.*[0-9].*/", $key);
-
-    if ($result == 0) {
-      $acceptable = FALSE;
+    if (!preg_match('/.*[0-9].*/', $key)) {
+      continue;
     }
+    break;
   }
 
   return $key;
