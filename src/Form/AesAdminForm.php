@@ -8,6 +8,7 @@ namespace Drupal\aes\Form;
 
 use Drupal\Core\Form\ConfigFormBase;
 use Drupal\Core\Form\FormStateInterface;
+use Drupal\aes\AES;
 
 /**
  * Provides a fields form controller.
@@ -29,7 +30,7 @@ class AesAdminForm extends ConfigFormBase {
     $fileStorage = \Drupal\Core\Config\FileStorageFactory::getActive();
     $config = $fileStorage->read('aes.settings');
 
-    $phpsec_loaded = aes_load_phpsec(FALSE);
+    $phpsec_loaded = AES::load_phpsec(FALSE);
 
     $form = array();
 
@@ -145,7 +146,7 @@ class AesAdminForm extends ConfigFormBase {
       // Get the old iv.
       $old_iv = $config['mcrypt_iv'];
       // create a new iv to match the new cipher
-      aes_make_iv();
+      AES::make_iv();
       // get the new iv
       $config = $fileStorage->read('aes.settings');
       $new_iv = $config['mcrypt_iv'];
@@ -172,7 +173,7 @@ class AesAdminForm extends ConfigFormBase {
         \Drupal\Core\Config\FileStorageFactory::getActive()->write('aes.settings', $config);
 
         // Create a new IV, this IV won't actually be used by phpseclib, but it's needed if the implementation is switched back to mcrypt.
-        aes_make_iv(TRUE);
+        AES::make_iv(TRUE);
       }
     }
   }

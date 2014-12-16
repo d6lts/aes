@@ -1,17 +1,19 @@
 <?php
-
 /**
  * @file
  *
  * Install/uninstall related functions.
  */
 
+use Drupal\aes\AES;
+
+require_once('src/AES.php');
+
 /**
  * Implements hook_requirements().
  */
 function aes_requirements($phase) {
-  // Make sure translations won't break on install.
-  $aes_implementations = aes_get_available_aes_implementations();
+  $aes_implementations = AES::get_available_implementations();
 
   if ($aes_implementations['mcrypt'] === FALSE && $aes_implementations['phpseclib'] === FALSE) {
     $requirement_severity = REQUIREMENT_ERROR;
@@ -41,31 +43,13 @@ function aes_requirements($phase) {
   return $requirements;
 }
 
-function aes_get_available_aes_implementations() {
-  $phpsec_available = FALSE;
-  if (\Drupal::moduleHandler()->moduleExists('libraries') && libraries_get_path('phpseclib')) {
-    $phpsec_include_path = libraries_get_path('phpseclib');
-    set_include_path(get_include_path() . PATH_SEPARATOR . $phpsec_include_path);
-    $phpsec_available = is_readable($phpsec_include_path . '/Crypt/AES.php');
-  }
-
-  if (extension_loaded('mcrypt')) {
-    $mcrypt_available = TRUE;
-  }
-  else {
-    $mcrypt_available = FALSE;
-  }
-
-  return array('mcrypt' => $mcrypt_available, 'phpseclib' => $phpsec_available);
-}
-
 /**
  * Implements hook_install().
  *
  * Please note - we moving our settings to YAML from default DB storage.
  */
 function aes_install() {
-  $aes_implementations = aes_get_available_aes_implementations();
+  $aes_implementations = AES::get_available_implementations();
   $config_db = \Drupal::config('aes.settings');
   if ($aes_implementations['mcrypt']) {
     $config_db->set('implementation', 'mcrypt');
@@ -94,14 +78,14 @@ function aes_install() {
   if ($config_files['implementation'] == 'mcrypt') {
     $iv = $config_files['mcrypt_iv'];
     if (empty($iv)) {
-      aes_make_iv();
+      AES::make_iv();
       $config_files = $fileStorage->read('aes.settings');
     }
   }
 
   // This will create a new key if one doesn't exist.
-  if (empty(aes_get_key())) {
-    $key = aes_make_key();
+  if (empty(AES::get_key())) {
+    $key = AES::make_key();
     $config_files['key'] = $key;
     $fileStorage->write('aes.settings', $config_files);
     \Drupal::logger('aes')->notice("AES module made a new key since one couldn't be found.");
