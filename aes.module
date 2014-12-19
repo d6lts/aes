@@ -534,7 +534,7 @@ function aes_get_password($uid, $decrypt = FALSE) {
 }
 
 function aes_get_key() {
-  $storage_method = variable_get("aes_key_storage_method", "database");
+  $storage_method = variable_get("aes_key_storage_method", "Database");
 
   if ($storage_method == "Database") {
     $key = variable_get("aes_key", FALSE);
