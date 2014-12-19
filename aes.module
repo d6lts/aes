@@ -112,12 +112,11 @@ function aes_config() {
     $phpseclib_error_msg = " <span style=\"color:#f00;\">" . t("Warning: phpseclib was found but couldn't be read, check permissions.") . "</span>";
   }
 
-  if (file_exists(variable_get("aes_key_path", "")) && is_writable(variable_get("aes_key_path", "")) == FALSE && variable_get("aes_key_storage_method", "") == "File") {
-    drupal_set_message(t("The keyfile %keyfile_path is not writable. This module needs to be able to write to this file to update the encryption key.", array('%keyfile_path' => variable_get("aes_key_path", ""))), "error");
+  if (file_exists(variable_get("aes_key_path", "")) && is_writable(variable_get("aes_key_path", "")) == FALSE && variable_get("aes_key_storage_method", "Database") == "File") {
+    drupal_set_message(t("The keyfile %keyfile_path is not writable. This module needs to be able to write to this file to update the encryption key.", array('%keyfile_path' => variable_get("aes_key_path", ""))), "warning");
   }
 
   $form = array();
-
   $form['aes'] = array(
     '#type' => 'fieldset',
     '#title' => t('AES settings'),
@@ -203,7 +202,7 @@ function aes_config() {
     '#type' => 'select',
     '#title' => t('Key storage method'),
     '#options' => array('Database' => 'Database', 'File' => 'File'),
-    '#default_value' => variable_get("aes_key_storage_method", ""),
+    '#default_value' => variable_get("aes_key_storage_method", "Database"),
     '#description' => t('If possible, you should use the file storage method and assign a path below.'),
   );
 
@@ -211,7 +210,7 @@ function aes_config() {
     '#type' => 'textfield',
     '#title' => t('Path to keyfile'),
     '#default_value' => variable_get("aes_key_path", ""),
-    '#description' => t('The path, including the filename, of the file in which to store your key. The access restrictions on this file should be set as high as possible while still allowing PHP read/write access.'),
+    '#description' => t('The path, including the filename, of the file in which to store your key. The access restrictions on this file should be set as high as possible while still allowing webserver read/write access.'),
   );
 
   $form['aes']['aes_key'] = array(
@@ -274,9 +273,9 @@ function aes_config_submit($form, &$form_state) {
   }
 
   // Check if the storage method or key path has changed.
-  if (($form_state['values']['aes_key_storage_method'] != variable_get("aes_key_storage_method", "")) || ($form_state['values']['aes_key_path'] != variable_get("aes_key_path",""))) {
+  if (($form_state['values']['aes_key_storage_method'] != variable_get("aes_key_storage_method", "Database")) || ($form_state['values']['aes_key_path'] != variable_get("aes_key_path",""))) {
     // If it has changed, we need to move the key.
-    if ($form_state['values']['aes_key_storage_method'] != variable_get("aes_key_storage_method", "")) {
+    if ($form_state['values']['aes_key_storage_method'] != variable_get("aes_key_storage_method", "Database")) {
       drupal_set_message(t("Switching key storage method to %method.", array('%method' => $form_state['values']['aes_key_storage_method'])));
     } else {
       drupal_set_message(t("Changed key file path."));
@@ -284,7 +283,7 @@ function aes_config_submit($form, &$form_state) {
     // get the key
     $key = aes_get_key();
     // delete the key from the old storage
-    aes_delete_key(variable_get("aes_key_storage_method", ""));
+    aes_delete_key(variable_get("aes_key_storage_method"));
     // set key path
     variable_set("aes_key_path", $form_state['values']['aes_key_path']);
     // set the new storage
@@ -582,7 +581,6 @@ function aes_store_key($key) {
 }
 
 function aes_delete_key($storage_method) {
-
   if ($storage_method == "Database") {
     variable_del("aes_key");
   }
@@ -866,45 +864,6 @@ function aes_decrypt($string, $base64encoded = TRUE, $custom_key = NULL, $custom
   }
 
   return trim($decrypted);
-}
-
-/**
- * Implements hook_enable().
- */
-function aes_enable() {
-
-  if (extension_loaded("mcrypt") === FALSE && aes_load_phpsec() === FALSE) {
-    drupal_set_message(t("The AES encryption module requires at least one of two things to function: Either the PHP Mcrypt extension has to be installed on the web server. Or the PHP Secure Communications Library (phpseclib) needs to be present in the AES directory. Installing phpseclib is probably the easiest thing to do, you can download a copy at http://phpseclib.sourceforge.net/. Extract the zip file into a directory named \"phpseclib\" inside the \"aes\" module directory and you should be good to go. Check the README.txt for more information."), "warning");
-  }
-
-  // Choose an implementation.
-  if (extension_loaded("mcrypt") === TRUE && aes_load_phpsec() !== TRUE) {
-    variable_set("aes_implementation", "mcrypt");
-  }
-  else {
-    if (extension_loaded("mcrypt") === FALSE && aes_load_phpsec() === TRUE) {
-      variable_set("aes_implementation", "phpseclib");
-    }
-    else {
-      if (extension_loaded("mcrypt") === TRUE && aes_load_phpsec() === TRUE) {
-        variable_set("aes_implementation", "mcrypt");
-      }
-      else {
-        variable_set("aes_implementation", "missing");
-      }
-    }
-  }
-
-  if (variable_get("aes_implementation", "mcrypt") == "mcrypt") {
-    $iv = base64_decode(variable_get("aes_encryption_iv", ""));
-    if (empty($iv)) {
-      aes_make_iv();
-    }
-  }
-
-  // This will create a new key if one doesn't exist.
-  aes_get_key();
-
 }
 
 function mcrypt_module_open_safe($algorithm, $algorithm_directory, $mode, $mode_directory) {
