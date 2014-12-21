@@ -205,19 +205,20 @@ class AES {
       return $base64encode ? base64_encode($encrypted) : $encrypted;
     }
 
-    if (!class_exists($implementation)) {
-      $error_msg = t('AES cannot find custom class implementation: %class', array('%class' => $implementation));
+    /* @var \Drupal\aes\Plugin\AESPluginManager $plugin_manager */
+    $plugin_manager = \Drupal::service('plugin.manager.aes');
+    try {
+      /* @var \Drupal\aes\Plugin\AESPluginBase $custom */
+      $custom = $plugin_manager->getInstanceById($implementation);
+      $encrypted = $custom->encrypt($string, $key, $cipher);
+    }
+    catch (\Exception $e) {
+      $error_msg = t('AES having problems with custom plugin implementation: %plugin . Message: %msg',
+        array('%plugin' => $implementation, '%msg' => $e->getMessage()));
       \Drupal::logger('aes')->error($error_msg);
       return FALSE;
     }
-    try {
-      $encrypted = call_user_func(array($implementation, 'encrypt'), $string, $key);
-      return $base64encode ? base64_encode($encrypted) : $encrypted;
-    }
-    catch (\Exception $e) {
-      \Drupal::logger('aes')->error($e->getMessage());
-    }
-    return FALSE;
+    return $base64encode ? base64_encode($encrypted) : $encrypted;
   }
 
   /**
@@ -290,19 +291,20 @@ class AES {
       return trim($decrypted);
     }
 
-    if (!class_exists($implementation)) {
-      $error_msg = t('AES cannot find custom class implementation: %class', array('%class' => $implementation));
+    /* @var \Drupal\aes\Plugin\AESPluginManager $plugin_manager */
+    $plugin_manager = \Drupal::service('plugin.manager.aes');
+    try {
+      /* @var \Drupal\aes\Plugin\AESPluginBase $custom */
+      $custom = $plugin_manager->getInstanceById($implementation);
+      $decrypted = $custom->decrypt($string, $key, $cipher);
+    }
+    catch (\Exception $e) {
+      $error_msg = t('AES having problems with custom plugin implementation: %plugin . Message: %msg',
+        array('%plugin' => $implementation, '%msg' => $e->getMessage()));
       \Drupal::logger('aes')->error($error_msg);
       return FALSE;
     }
-    try {
-      $decrypted = call_user_func(array($implementation, 'decrypt'), $string, $key);
-      return trim($decrypted);
-    }
-    catch (\Exception $e) {
-      \Drupal::logger('aes')->error($e->getMessage());
-    }
-    return FALSE;
+    return $decrypted;
   }
 
 }

@@ -29,7 +29,7 @@ class Cryptor extends Plugin {
    *
    * @ingroup plugin_translatable
    *
-   * @var \Drupal\Core\Annotation\Translation
+   * @var string
    */
   public $label;
 
@@ -38,7 +38,7 @@ class Cryptor extends Plugin {
    *
    * @ingroup plugin_translatable
    *
-   * @var \Drupal\Core\Annotation\Translation
+   * @var string
    */
   public $description;
 

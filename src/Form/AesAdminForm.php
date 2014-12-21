@@ -49,7 +49,7 @@ class AesAdminForm extends ConfigFormBase {
     }
 
     if (!empty($encryption_implementations['mcrypt']) && !empty($encryption_implementations['phpseclib'])) {
-      $implementations_description = t('The Mcrypt implementation is the (only) implementation this module used until support for phpseclib was added. The Mcrypt implementation is faster than phpseclib and also lets you define the cipher to be used, other than that, the two implementations are equivalent.');
+      $implementations_description = t('The Mcrypt implementation is faster than phpseclib and also lets you define the cipher to be used, other than that, the two core implementations are equivalent. Additional implementations might be added via plugin system.');
     }
     elseif (!empty($encryption_implementations['mcrypt']) && empty($encryption_implementations['phpseclib'])) {
       $implementations_description = t('The Mcrypt extension is the only installed implementation.') . $phpseclib_error_msg;
@@ -58,8 +58,15 @@ class AesAdminForm extends ConfigFormBase {
       $implementations_description = t('PHP Secure Communications Library is the only installed implementation.');
     }
 
+    /* @var \Drupal\aes\Plugin\AESPluginManager $plugin_manager */
+    $plugin_manager = \Drupal::service('plugin.manager.aes');
+    $plugin_definitions = $plugin_manager->getDefinitions();
+    foreach ($plugin_definitions as $plugin_definition) {
+      $encryption_implementations[$plugin_definition['id']] = 'Plugin: ' . $plugin_definition['label'];
+    }
+
     if (empty($encryption_implementations)) {
-      drupal_set_message(t('You do not have an AES implementation installed! For correct AES work you need an encryption library, like PhpSecLib or MCrypt. Consult REAMDE.txt for more details.'), 'error');
+      drupal_set_message(t('You do not have an AES implementation installed! For correct AES work you need an encryption library (PhpSecLib, MCrypt) or own plugin implementation. Consult READMDE.txt for more details.'), 'error');
       return array();
     }
 
@@ -71,17 +78,6 @@ class AesAdminForm extends ConfigFormBase {
       '#description' => $implementations_description,
     );
 
-    if ($config['implementation'] == 'phpseclib') {
-      $cipher_select_value = 'rijndael-128';
-      $cipher_select_disabled = TRUE;
-      $cipher_description = t('Cipher is locked to Rijndael 128 when using the phpseclib implementation.');
-    }
-    else {
-      $cipher_select_value = $config['cipher'];
-      $cipher_select_disabled = FALSE;
-      $cipher_description = '';
-    }
-
     $form['aes']['cipher'] = array(
       '#type' => 'select',
       '#title' => t('Cipher'),
@@ -90,9 +86,21 @@ class AesAdminForm extends ConfigFormBase {
         'rijndael-192' => 'Rijndael 192',
         'rijndael-256' => 'Rijndael 256',
       ),
-      '#default_value' => $cipher_select_value,
-      '#disabled' => $cipher_select_disabled,
-      '#description' => $cipher_description,
+      '#default_value' => $config['cipher'],
+      '#states' => array(
+        'disabled' => array(
+          ':input[name="implementation"]' => array('value' => 'phpseclib'),
+        ),
+      ),
+    );
+    $form['aes']['cipher_comment'] = array(
+      '#type' => 'item',
+      '#description' => t('Cipher can be chosen for MCrypt implementation only. The phpseclib implementation is locked to Rijndael 128.'),
+      '#states' => array(
+        'visible' => array(
+          ':input[name="implementation"]' => array('value' => 'phpseclib'),
+        ),
+      ),
     );
 
     $form['aes']['key'] = array(

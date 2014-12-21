@@ -37,5 +37,5 @@ phpseclib instead).
 
 ALTERNATIVE ENCRYPTION
 ----------------------
-You may use your own encryption with this module. To do so, define a class with 2 static methods in it, see detailed
-information and example in the API.txt file
+You may use your own encryption with this module. To do so, define a Plugin based on examples provided. Detailed
+information is in the API.txt file .
