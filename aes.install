@@ -84,7 +84,7 @@ function aes_install() {
   }
 
   // This will create a new key if one doesn't exist.
-  if (empty(AES::get_key())) {
+  if (!AES::get_key()) {
     $key = AES::make_key();
     $config_files['key'] = $key;
     $fileStorage->write('aes.settings', $config_files);
