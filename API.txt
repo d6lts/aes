@@ -134,3 +134,27 @@ Arguments:
 
 Returns:
 nothing
+
+---------------------------------------------------------------------------------
+Hook:
+void hook_aes_config_change($decrypt_params, $encrypt_params)
+
+Description:
+This hook provide ability for developers to reencrypt data when aes configuration changed.
+
+Arguments:
+$decrypt_params An associative array with decrypt arguments containing the following keys:
+ - base64encode bool Whether this encrypted string is base64 encoded or not.
+ - custom_key string Use this as the key rather than the stored one for this operation.
+ - custom_cipher string Use this cipher rather than the default one. (only with Mcrypt - ignored with phpseclib)
+ - custom_iv Use string this initialization vector instead of the default one.
+ - custom_implementation string Can be "phpseclib" or "mcrypt". Warning: Does not check if the requested implementation actually exists.
+
+$encrypt_params An associative array with encrypt arguments containing the following keys:
+ - bool $base64encode bool Whether to return the string base64 encoded (recommended for database insertion).
+ - $custom_key string Use this as the key rather than the stored one for this operation.
+ - $custom_cipher string Use this cipher rather than the default one. (only with Mcrypt - ignored with phpseclib)
+ - $custom_iv string Use this initialization vector instead of the default one.
+ - $custom_implementation string Can be "phpseclib" or "mcrypt". Warning: Does not check if the requested implementation actually exists.
+
+See: aes_aes_config_change();

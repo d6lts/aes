@@ -259,6 +259,9 @@ function aes_config_validate($form, &$form_state) {
 }
 
 function aes_config_submit($form, &$form_state) {
+
+  variable_set("aes_viewing_method", $form_state['values']['view_method']);
+
   if ($form_state['values']['aes_convert']) {
     if (!variable_get("aes_convert", FALSE)) {
       variable_set("aes_convert", TRUE);
@@ -310,6 +313,7 @@ function aes_config_submit($form, &$form_state) {
     'custom_implementation' => NULL,
   );
   $do_reencypt = FALSE;
+
   // If the cipher has changed...
   if ($form_state['values']['aes_cipher'] != variable_get("aes_cipher", "rijndael-128")) {
     variable_set("aes_cipher", $form_state['values']['aes_cipher']);
@@ -356,30 +360,40 @@ function aes_config_submit($form, &$form_state) {
   }
 
   if ($do_reencypt) {
-    $accounts = db_select('aes_passwords', 'p')
-      ->fields('p', array('uid', 'pass'))
-      ->condition('uid', 0, '!=')
-      ->execute()
-      ->fetchAll();
-    foreach ($accounts as $account) {
-      $decrypt_params['string'] = $account->pass;
-      $plain_pass = call_user_func_array('aes_decrypt', $decrypt_params);
-      $encrypt_params['string'] = $plain_pass;
-      $new_pass = call_user_func_array('aes_encrypt', $encrypt_params);
-      db_update('aes_passwords')
-        ->fields(array('pass' => $new_pass))
-        ->where("uid = :uid", array(
-          ':uid' => $account->uid,
-        ))
-        ->execute();
-    }
-    if (count($accounts)) {
-      drupal_set_message(t("Updated the passwords of @updates_num users because of a change in encryption settings.", array('@updates_num' => count($accounts))));
+    // Calling custom hook_aes_config_change from each module which
+    // implements this hook.
+    foreach (module_implements('aes_config_change') as $module) {
+      $function = $module . '_aes_config_change';
+      $function($decrypt_params, $encrypt_params);
     }
   }
+}
 
-  variable_set("aes_viewing_method", $form_state['values']['view_method']);
-
+/**
+ * Implements hook_aes_config_change().
+ */
+function aes_aes_config_change($decrypt_params, $encrypt_params) {
+  // Re encrypt user paswords.
+  $accounts = db_select('aes_passwords', 'p')
+    ->fields('p', array('uid', 'pass'))
+    ->condition('uid', 0, '!=')
+    ->execute()
+    ->fetchAll();
+  foreach ($accounts as $account) {
+    $decrypt_params['string'] = $account->pass;
+    $plain_pass = call_user_func_array('aes_decrypt', $decrypt_params);
+    $encrypt_params['string'] = $plain_pass;
+    $new_pass = call_user_func_array('aes_encrypt', $encrypt_params);
+    db_update('aes_passwords')
+      ->fields(array('pass' => $new_pass))
+      ->where("uid = :uid", array(
+        ':uid' => $account->uid,
+      ))
+      ->execute();
+  }
+  if (count($accounts)) {
+    drupal_set_message(t("Updated the passwords of @updates_num users because of a change in encryption settings.", array('@updates_num' => count($accounts))));
+  }
 }
 
 /**
