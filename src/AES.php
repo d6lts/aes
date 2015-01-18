@@ -5,6 +5,8 @@
 
 namespace Drupal\aes;
 
+use Drupal\Core\Config\FileStorageFactory;
+
 class AES {
   /**
    * Retrieve information about available AES implementations.
@@ -74,7 +76,7 @@ class AES {
    * @return string encryption key.
    */
   static public function get_key() {
-    $config = \Drupal\Core\Config\FileStorageFactory::getActive()->read('aes.settings');
+    $config = FileStorageFactory::getActive()->read('aes.settings');
     return isset($config['key']) ? $config['key'] : FALSE;
   }
 
@@ -115,7 +117,7 @@ class AES {
    * @param bool $ignore_implementation
    */
   static public function make_iv($ignore_implementation = FALSE) {
-    $config = \Drupal\Core\Config\FileStorageFactory::getActive()->read('aes.settings');
+    $config = FileStorageFactory::getActive()->read('aes.settings');
 
     // Bail out if using phpseclib
     if ($config['implementation'] == 'phpseclib' && $ignore_implementation == FALSE) {
@@ -132,7 +134,7 @@ class AES {
     $iv = mcrypt_create_iv(mcrypt_enc_get_iv_size($cryptor), $randgen);
     mcrypt_module_close($cryptor);
     $config['mcrypt_iv'] = base64_encode($iv);
-    \Drupal\Core\Config\FileStorageFactory::getActive()->write('aes.settings', $config);
+    FileStorageFactory::getActive()->write('aes.settings', $config);
   }
 
   /**
@@ -161,7 +163,7 @@ class AES {
       return FALSE;
     }
 
-    $config = \Drupal\Core\Config\FileStorageFactory::getActive()->read('aes.settings');
+    $config = FileStorageFactory::getActive()->read('aes.settings');
     $cipher = empty($custom_cipher) ? $config['cipher'] : $custom_cipher;
     $key = empty($custom_key) ? self::get_key() : $custom_key;
     $implementation = $force_implementation ? $force_implementation : $config['implementation'];
@@ -189,7 +191,7 @@ class AES {
 
       if (empty($iv)) {
         self::make_iv();
-        $config = \Drupal\Core\Config\FileStorageFactory::getActive()->read('aes.settings');
+        $config = FileStorageFactory::getActive()->read('aes.settings');
         $iv = base64_decode($config['mcrypt_iv']);
         \Drupal::logger('aes')
           ->warning('No initialization vector found while trying to encrypt! Recreated a new one now and will try to carry on as normal.');
@@ -247,7 +249,7 @@ class AES {
       return FALSE;
     }
 
-    $config = \Drupal\Core\Config\FileStorageFactory::getActive()->read('aes.settings');
+    $config = FileStorageFactory::getActive()->read('aes.settings');
     if ($base64encoded) {
       $string = base64_decode($string);
     }

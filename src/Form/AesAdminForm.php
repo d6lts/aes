@@ -9,6 +9,7 @@ namespace Drupal\aes\Form;
 use Drupal\Core\Form\ConfigFormBase;
 use Drupal\Core\Form\FormStateInterface;
 use Drupal\aes\AES;
+use Drupal\Core\Config\FileStorageFactory;
 
 /**
  * Provides a fields form controller.
@@ -27,7 +28,7 @@ class AesAdminForm extends ConfigFormBase {
    */
   public function buildForm(array $form, FormStateInterface $form_state) {
     // $config = $this->config('aes.settings')->getRawData();
-    $fileStorage = \Drupal\Core\Config\FileStorageFactory::getActive();
+    $fileStorage = FileStorageFactory::getActive();
     $config = $fileStorage->read('aes.settings');
 
     $phpsec_loaded = AES::load_phpsec(FALSE);
@@ -141,7 +142,7 @@ class AesAdminForm extends ConfigFormBase {
   public function submitForm(array &$form, FormStateInterface $form_state) {
     \Drupal::logger('aes')->notice('Saving config...');
     // $config = $this->config('aes.settings')->getRawData();
-    $fileStorage = \Drupal\Core\Config\FileStorageFactory::getActive();
+    $fileStorage = FileStorageFactory::getActive();
     $config = $fileStorage->read('aes.settings');
 
     // If the cipher has changed...
@@ -149,7 +150,7 @@ class AesAdminForm extends ConfigFormBase {
     $new_cipher = $form_state->getValue('cipher');
     if ($form_state->getValue('cipher') != $config['cipher']) {
       $config['cipher'] = $form_state->getValue('cipher');
-      \Drupal\Core\Config\FileStorageFactory::getActive()->write('aes.settings', $config);
+      FileStorageFactory::getActive()->write('aes.settings', $config);
 
       // Get the old iv.
       $old_iv = $config['mcrypt_iv'];
@@ -163,7 +164,7 @@ class AesAdminForm extends ConfigFormBase {
     // If the key has changed...
     if ($form_state->getValue('key') != $config['key']) {
       $config['key'] = $form_state->getValue('key');
-      \Drupal\Core\Config\FileStorageFactory::getActive()->write('aes.settings', $config);
+      FileStorageFactory::getActive()->write('aes.settings', $config);
 
       drupal_set_message(t('Key changed.'));
       // @todo: invoke hook?
@@ -173,16 +174,25 @@ class AesAdminForm extends ConfigFormBase {
     if ($form_state->getValue('implementation') != $config['implementation']) {
 
       $config['implementation'] = $form_state->getValue('implementation');
-      \Drupal\Core\Config\FileStorageFactory::getActive()->write('aes.settings', $config);
+      FileStorageFactory::getActive()->write('aes.settings', $config);
 
       if ($form_state->getValue('implementation') == 'phpseclib') {
         // If we have switched to phpseclib implementation, set the cipher to 128, since it's the only one phpseclib supports.
         $config['cipher'] = 'rijndael-128';
-        \Drupal\Core\Config\FileStorageFactory::getActive()->write('aes.settings', $config);
+        FileStorageFactory::getActive()->write('aes.settings', $config);
 
         // Create a new IV, this IV won't actually be used by phpseclib, but it's needed if the implementation is switched back to mcrypt.
         AES::make_iv(TRUE);
       }
     }
+  }
+
+  /**
+   * {@inheritdoc}
+   */
+  protected function getEditableConfigNames() {
+    return [
+      'aes.settings',
+    ];
   }
 }

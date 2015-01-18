@@ -1,31 +1,33 @@
 <?php
 /**
  * @file
- *
- * Install/uninstall related functions.
+ * Install/uninstall aes related functions.
  */
 
 use Drupal\aes\AES;
 
+// @todo move this to service.
 require_once('src/AES.php');
+
+use Drupal\Core\Config\FileStorageFactory;
 
 /**
  * Implements hook_requirements().
  */
 function aes_requirements($phase) {
-  $aes_implementations = AES::get_available_implementations();
+  $aesImplementations = AES::get_available_implementations();
 
-  if ($aes_implementations['mcrypt'] === FALSE && $aes_implementations['phpseclib'] === FALSE) {
-    $requirement_severity = REQUIREMENT_ERROR;
+  if ($aesImplementations['mcrypt'] === FALSE && $aesImplementations['phpseclib'] === FALSE) {
+    $requirementSeverity = REQUIREMENT_ERROR;
     $value = t('The AES encryption module requires at least one of two things to function: Either the PHP Mcrypt extension has to be installed on the web server, or the PHP Secure Communications Library (phpseclib) needs to be installed in the AES directory. Check the README.txt for more information.');
   }
   else {
-    $requirement_severity = REQUIREMENT_OK;
-    if ($aes_implementations['mcrypt'] && $aes_implementations['phpseclib']) {
+    $requirementSeverity = REQUIREMENT_OK;
+    if ($aesImplementations['mcrypt'] && $aesImplementations['phpseclib']) {
       $value = t('Both MCrypt and PHP Secure Communications Library are available.');
     }
     else {
-      if ($aes_implementations['mcrypt']) {
+      if ($aesImplementations['mcrypt']) {
         $value = t('MCrypt is available.');
       }
       else {
@@ -37,7 +39,7 @@ function aes_requirements($phase) {
   $requirements['aes'] = array(
     'title' => t('AES encryption implementation'),
     'value' => $value,
-    'severity' => $requirement_severity,
+    'severity' => $requirementSeverity,
   );
 
   return $requirements;
@@ -49,46 +51,60 @@ function aes_requirements($phase) {
  * Please note - we moving our settings to YAML from default DB storage.
  */
 function aes_install() {
-  $aes_implementations = AES::get_available_implementations();
-  $config_db = \Drupal::config('aes.settings');
-  if ($aes_implementations['mcrypt']) {
-    $config_db->set('implementation', 'mcrypt');
-    $install_msg = t('AES installed using the Mcrypt implementation.');
+  $aesImplementations = AES::get_available_implementations();
+  $configDbImmutable = \Drupal::config('aes.settings');
+  $configDbMutable = \Drupal::configFactory()
+    ->getEditable('aes.settings');
+  if ($aesImplementations['mcrypt']) {
+    $configDbMutable
+      ->set('implementation', 'mcrypt')
+      ->save();
+    $installMsg = t('AES installed using the Mcrypt implementation.');
   }
   else {
-    if ($aes_implementations['phpseclib']) {
-      $config_db->set('implementation', 'phpseclib');
-      $install_msg = t('AES installed using the phpseclib implementation.');
+    if ($aesImplementations['phpseclib']) {
+      $configDbMutable
+        ->set('implementation', 'phpseclib')
+        ->save();
+      $installMsg = t('AES installed using the phpseclib implementation.');
     }
     else {
       // This case shouldn't actually be possible since hook_requirements should stop the installation if there's no implementation.
-      $config_db->set('implementation', 'missing');
-      $install_msg = t('AES installed without any implementation!');
+      $configDbMutable
+        ->set('implementation', 'missing')
+        ->save();
+      $installMsg = t('AES installed without any implementation!');
     }
   }
 
   // Copy settings to YAML file storage.
-  $fileStorage = \Drupal\Core\Config\FileStorageFactory::getActive();
-  $fileStorage->write('aes.settings', $config_db->getRawData());
+  $fileStorage = FileStorageFactory::getActive();
+  $fileStorage->write('aes.settings', $configDbImmutable->getRawData());
   // And remove settings from DB.
-  $config_db->initWithData(array('msg' => 'Configuration is stored in setting YAML file.'))->save();
-  $config_files = $fileStorage->read('aes.settings');
-  drupal_set_message($install_msg);
+  $configDbMutable
+    ->initWithData(array('msg' => 'Configuration is stored in setting YAML file.'))
+    ->save();
+  $configFiles = $fileStorage
+    ->read('aes.settings');
+  drupal_set_message($installMsg);
 
-  if ($config_files['implementation'] == 'mcrypt') {
-    $iv = $config_files['mcrypt_iv'];
+  if ($configFiles['implementation'] == 'mcrypt') {
+    $iv = $configFiles['mcrypt_iv'];
     if (empty($iv)) {
       AES::make_iv();
-      $config_files = $fileStorage->read('aes.settings');
+      $configFiles = $fileStorage
+        ->read('aes.settings');
     }
   }
 
   // This will create a new key if one doesn't exist.
   if (!AES::get_key()) {
     $key = AES::make_key();
-    $config_files['key'] = $key;
-    $fileStorage->write('aes.settings', $config_files);
-    \Drupal::logger('aes')->notice("AES module made a new key since one couldn't be found.");
+    $configFiles['key'] = $key;
+    $fileStorage
+      ->write('aes.settings', $configFiles);
+    \Drupal::logger('aes')
+      ->notice("AES module made a new key since one couldn't be found.");
   }
 }
 
@@ -96,6 +112,7 @@ function aes_install() {
  * Implements hook_uninstall().
  */
 function aes_uninstall() {
-  \Drupal\Core\Config\FileStorageFactory::getActive()->delete('aes.settings');
+  FileStorageFactory::getActive()
+    ->delete('aes.settings');
   drupal_set_message(t('AES uninstalled.'));
 }
