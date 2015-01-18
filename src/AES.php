@@ -186,6 +186,7 @@ class AES {
       return $base64encode ? base64_encode($encrypted) : $encrypted;
     }
     if ($implementation == 'mcrypt') {
+      // @todo remove this because we have Mcrypt plugin.
       $td = mcrypt_module_open($cipher, '', MCRYPT_MODE_CBC, '');
       $iv = base64_decode($custom_iv ? $custom_iv : $config['mcrypt_iv']);
 
@@ -277,6 +278,7 @@ class AES {
     }
 
     if ($implementation == 'mcrypt') {
+      // @todo remove this because we have Mcrypt plugin.
       $td = mcrypt_module_open($cipher, '', MCRYPT_MODE_CBC, '');
       $ks = mcrypt_enc_get_key_size($td);
       $iv = base64_decode($custom_iv ? $custom_iv : $config['mcrypt_iv']);
