@@ -35,6 +35,15 @@ function aes_menu() {
     'type' => MENU_LOCAL_TASK,
   );
 
+  $items['aes_get_password_callback/%'] = array(
+    'title' => 'User\'s password',
+    'page callback' => 'aes_ajax_callback',
+    'page arguments' => array(1),
+    'access callback' => 'aes_show_password_page',
+    'access arguments' => array('view passwords', 1),
+    'type' => MENU_CALLBACK,
+  );
+
   return $items;
 }
 
@@ -403,11 +412,15 @@ function aes_user_view($account, $view_mode, $langcode) {
   if (user_access('view passwords') && (variable_get("aes_viewing_method", "page") == "collapsible" || variable_get("aes_viewing_method", "page") == "both") && variable_get("aes_convert", FALSE)) {
 
     if (aes_password_exists($account->uid)) {
-      $password_form = drupal_get_form('aes_view_password_form', aes_get_password($account->uid, TRUE));
+      drupal_add_library('system', 'drupal.ajax');
+      $link = l(t('Show password'),
+        'aes_get_password_callback/' . $account->uid . '/nojs/',
+        array('attributes' => array('class' => array('use-ajax')))
+      );
       $account->content['info']['aes_password'] = array(
         '#type' => 'user_profile_item',
         '#title' => t('AES Encryption'),
-        '#markup' => drupal_render($password_form),
+        '#markup' => '<div id="aes_password">' . $link . '</div>',
       );
     }
     else {
@@ -417,7 +430,38 @@ function aes_user_view($account, $view_mode, $langcode) {
         '#markup' => t("This user's password does not yet exist in AES encrypted form."),
       );
     }
+  }
+}
 
+/**
+ * Callback for user's password ajax link.
+ *
+ * Takes different logic paths based on whether Javascript was enabled.
+ * If $type == 'ajax', it tells this function that ajax.js has rewritten
+ * the URL and thus we are doing an AJAX and can return an array of commands.
+ *
+ * @param int $uid
+ *   User's identifier.
+ *
+ * @param string $type
+ *   Either 'ajax' or 'nojs.
+ *
+ * @return string|array
+ *   If $type == 'ajax', returns an array of AJAX Commands.
+ *   Otherwise, just returns the content, which will end up being a page.
+ */
+function aes_ajax_callback($uid, $type = 'ajax') {
+  $output = aes_get_password($uid, TRUE);
+  if ($type == 'ajax') {
+    $commands = array();
+    $commands[] = ajax_command_replace('#aes_password', $output);
+    $page = array('#type' => 'ajax', '#commands' => $commands);
+    ajax_deliver($page);
+  }
+  else {
+    $user = user_load($uid, FALSE);
+    drupal_set_title($user->name . '\'s password');
+    return $output;
   }
 }
 
@@ -502,19 +546,6 @@ function aes_user_alter(&$edit, $account) {
       }
     }
   }
-}
-
-function aes_view_password_form($form_state, $password) {
-
-  $form['password'] = array(
-    '#type' => 'fieldset',
-    '#title' => t("Show password"),
-    '#description' => $password['build_info']['args'][0],
-    '#collapsible' => TRUE,
-    '#collapsed' => TRUE,
-  );
-
-  return $form;
 }
 
 function aes_password_exists($uid) {
