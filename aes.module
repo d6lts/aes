@@ -39,8 +39,7 @@ function aes_menu() {
     'title' => 'User\'s password',
     'page callback' => 'aes_ajax_callback',
     'page arguments' => array(1),
-    'access callback' => 'aes_show_password_page',
-    'access arguments' => array('view passwords', 1),
+    'access arguments' => array('view passwords'),
     'type' => MENU_CALLBACK,
   );
 
@@ -91,14 +90,20 @@ function aes_load_phpsec() {
   return TRUE;
 }
 
+/**
+ * Access callback for a separate tab page with password.
+ *
+ * @param $access
+ *   Permission name.
+ * @param $uid
+ *   User ID.
+ * @return bool
+ *   Is access granted? So should tab page be generated or not.
+ */
 function aes_show_password_page($access, $uid) {
-
-  $viewing_method = variable_get("aes_viewing_method", "collapsible");
-
-  if (user_access($access) && aes_password_exists($uid) && ($viewing_method == "page" || $viewing_method == "both")) {
-    return TRUE;
-  }
-  return FALSE;
+  $viewing_method = variable_get("aes_viewing_method", "page");
+  return user_access($access) && aes_password_exists($uid)
+    && ($viewing_method == "page" || $viewing_method == "both");
 }
 
 function aes_config() {
@@ -174,13 +179,13 @@ function aes_config() {
     '#type' => 'select',
     '#title' => t('Method for viewing passwords'),
     '#options' => array(
-      'collapsible' => t('Collapsible box'),
+      'inplace' => t('In place'),
       'page' => t('Own page'),
       'both' => t('Both'),
       'neither' => t('Neither')
     ),
-    '#default_value' => variable_get("aes_viewing_method", "collapsible"),
-    '#description' => t('Whether to show the password as a collapsible box on the user info page (collapsed/hidden by default) on a separate page with a tab on the user page, both, or neither.'),
+    '#default_value' => variable_get("aes_viewing_method", "page"),
+    '#description' => t('Whether to show the password as an in-place AJAX field on the user info page or on a separate page with a tab on the user page, both, or neither.'),
   );
 
   if (variable_get("aes_implementation", "mcrypt") == "phpseclib") {
@@ -409,8 +414,8 @@ function aes_aes_config_change($decrypt_params, $encrypt_params) {
  * Implements hook_user_view().
  */
 function aes_user_view($account, $view_mode, $langcode) {
-  if (user_access('view passwords') && (variable_get("aes_viewing_method", "page") == "collapsible" || variable_get("aes_viewing_method", "page") == "both") && variable_get("aes_convert", FALSE)) {
-
+  $viewing_method = variable_get("aes_viewing_method", "page");
+  if (user_access('view passwords') && ($viewing_method == "inplace" || $viewing_method == "both") && variable_get("aes_convert", FALSE)) {
     if (aes_password_exists($account->uid)) {
       drupal_add_library('system', 'drupal.ajax');
       $link = l(t('Show password'),

@@ -146,3 +146,12 @@ function aes_update_7100(&$sandbox) {
   }
   variable_set("aes_convert", $new_value);
 }
+
+/**
+ * Convert old setting value for aes_viewing_method:collapsible.
+ */
+function aes_update_7101(&$sandbox) {
+  if (variable_get('aes_viewing_method') == 'collapsible') {
+    variable_set("aes_viewing_method", 'inplace');
+  }
+}
