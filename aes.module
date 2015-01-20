@@ -444,7 +444,7 @@ function aes_user_view($account, $view_mode, $langcode) {
  *   User's identifier.
  *
  * @param string $type
- *   Either 'ajax' or 'nojs.
+ *   Either 'ajax' or 'nojs'.
  *
  * @return string|array
  *   If $type == 'ajax', returns an array of AJAX Commands.
@@ -452,17 +452,15 @@ function aes_user_view($account, $view_mode, $langcode) {
  */
 function aes_ajax_callback($uid, $type = 'ajax') {
   $output = aes_get_password($uid, TRUE);
-  if ($type == 'ajax') {
-    $commands = array();
-    $commands[] = ajax_command_replace('#aes_password', $output);
-    $page = array('#type' => 'ajax', '#commands' => $commands);
-    ajax_deliver($page);
-  }
-  else {
+  if ($type != 'ajax') {
     $user = user_load($uid, FALSE);
     drupal_set_title($user->name . '\'s password');
     return $output;
   }
+  $commands = array();
+  $commands[] = ajax_command_replace('#aes_password', $output);
+  $page = array('#type' => 'ajax', '#commands' => $commands);
+  ajax_deliver($page);
 }
 
 /**
