@@ -60,7 +60,7 @@
  * @return bool|string
  *   The encrypted string on success, FALSE on error.
  */
-function aes_encrypt($string, $base64encode = TRUE, $custom_key = NULL, $custom_cipher = NULL, $custom_iv = NULL, $custom_implementation = NULL)
+//function aes_encrypt($string, $base64encode = TRUE, $custom_key = NULL, $custom_cipher = NULL, $custom_iv = NULL, $custom_implementation = NULL) {}
 
 /**
  * Decrypts a string of encrypted data.
@@ -95,9 +95,22 @@ function aes_encrypt($string, $base64encode = TRUE, $custom_key = NULL, $custom_
  *   implementation actually exists.
  *
  * @return bool|string
- *   The decrypted string on success, false on error.
+ *   The decrypted string on success, FALSE on error.
  */
-function aes_decrypt($string, $base64encoded = TRUE, $custom_key = NULL, $custom_cipher = NULL, $custom_iv = NULL, $custom_implementation = NULL)
+//function aes_decrypt($string, $base64encoded = TRUE, $custom_key = NULL, $custom_cipher = NULL, $custom_iv = NULL, $custom_implementation = NULL) {}
+
+/**
+ * Stores the key given by writing it to the storage method currently used
+ * (database or file). This could be pretty useful for create profiles or
+ * distributions.
+ *
+ * @param string $key
+ *   The key.
+ *
+ * @return bool
+ *   TRUE on success, FALSE otherwise.
+ */
+//function aes_store_key($key) {}
 
 /**
  * Checks if a users password exists.
@@ -117,7 +130,7 @@ function aes_decrypt($string, $base64encoded = TRUE, $custom_key = NULL, $custom
  * @return bool
  *   TRUE if encrypted password is exist. FALSE otherwise.
  */
-function aes_password_exists($uid)
+//function aes_password_exists($uid) {}
 
 /**
  * Gets a users password, in plain text, or in it's encrypted form.
@@ -139,13 +152,13 @@ function aes_password_exists($uid)
  *   The user ID.
  * @param bool $decrypt
  *   (optional) Whether to decrypt the password before returning it, or not.
- *   Defaults to false.
+ *   Defaults to FALSE.
  * @see aes_ajax_callback()
  *
  * @return bool|string
  *   The password in plain text on success, FALSE otherwise.
  */
-function aes_get_password($uid, $decrypt = FALSE)
+//function aes_get_password($uid, $decrypt = FALSE) {}
 
 /**
  * @addtogroup hooks

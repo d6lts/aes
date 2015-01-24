@@ -576,7 +576,7 @@ function aes_user_alter(&$edit, $account) {
  * // Implements hook_user_view().
  * function mymodule_user_view($account, $view_mode, $langcode) {
  *   if (aes_password_exists($account->uid)) {
- *     // You custom code
+ *     // Your custom code.
  *   }
  * }
  * @endcode
@@ -587,7 +587,7 @@ function aes_user_alter(&$edit, $account) {
  * @see aes_user_view()
  *
  * @return bool
- *   TRUE if encrypted password is exist. FALSE otherwise.
+ *   TRUE if encrypted password is exists, FALSE otherwise.
  */
 function aes_password_exists($uid) {
   $result = db_query("SELECT uid FROM {aes_passwords} WHERE uid = :uid", array(':uid' => $uid));
@@ -619,9 +619,9 @@ function aes_password_exists($uid) {
  *
  * @param int $uid
  *   The user ID.
- * @param bool $decrypt The user ID.
+ * @param bool $decrypt
  *   (optional) Whether to decrypt the password before returning it, or not.
- *   Defaults to false.
+ *   Defaults to FALSE.
  * @see aes_ajax_callback()
  *
  * @return bool|string
@@ -686,26 +686,22 @@ function aes_get_key() {
  */
 function aes_store_key($key) {
   $storage_method = variable_get("aes_key_storage_method", "Database");
-
   if ($storage_method == "Database") {
     variable_set("aes_key", $key);
-  }
-  else {
-    if ($storage_method == "File") {
-      $fp = fopen(variable_get("aes_key_path", ""), "w");
-      if ($fp === FALSE) {
-        drupal_set_message(t("Couldn't write key to file " . variable_get("aes_key_path", "")), "error");
-        return FALSE;
-      }
-      $key = fwrite($fp, $key);
-      fclose($fp);
-    }
-    else {
-      drupal_set_message(t("Unknown storage method in AES module."), "error");
-      return FALSE;
-    }
+    return TRUE;
   }
 
+  if ($storage_method != "File") {
+    throw new Exception('Unknown storage method in AES module: ' . $storage_method);
+  }
+
+  $fp = fopen(variable_get("aes_key_path", ""), "w");
+  if ($fp === FALSE) {
+    drupal_set_message(t("Couldn't write key to file " . variable_get("aes_key_path", "")), "error");
+    return FALSE;
+  }
+  fwrite($fp, $key);
+  fclose($fp);
   return TRUE;
 }
 
@@ -806,7 +802,7 @@ function aes_make_iv($ignore_implementation = FALSE) {
  *   implementation actually exists.
  *
  * @return bool|string
- *   The encrypted string on success, false on error.
+ *   The encrypted string on success, FALSE on error.
  */
 function aes_encrypt($string, $base64encode = TRUE, $custom_key = NULL, $custom_cipher = NULL, $custom_iv = NULL, $custom_implementation = NULL) {
 
@@ -920,7 +916,7 @@ function aes_encrypt($string, $base64encode = TRUE, $custom_key = NULL, $custom_
  *   implementation actually exists.
  *
  * @return bool|string
- *   The decrypted string on success, false on error.
+ *   The decrypted string on success, FALSE on error.
  */
 function aes_decrypt($string, $base64encoded = TRUE, $custom_key = NULL, $custom_cipher = NULL, $custom_iv = NULL, $custom_implementation = NULL) {
 

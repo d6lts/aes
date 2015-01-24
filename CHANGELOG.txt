@@ -1,3 +1,15 @@
+7.x-1.8 -> 7.x-1.9
+
+  * Implemented hook_aes_config_change(). https://drupal.org/node/1415550 .
+
+  * Password viewing method is more secure for non-JS users. https://drupal.org/node/1114780 .
+
+  * Fixed bug with unattended installation. Issue: https://drupal.org/node/2394761 .
+
+  * Correct handling the cases when mcrypt became unavailable. Issue: https://drupal.org/node/2088357 .
+
+  * Some documentation clean-up.
+
 7.x-1.7 -> 7.x-1.8
 
   * Phpseclib: Integrated AES with the libraries API. PHPSeclib now preferable to be placed into libraries.
