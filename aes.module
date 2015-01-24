@@ -65,6 +65,9 @@ function aes_permission() {
 
 /**
  * Loads phpseclib.
+ *
+ * @return bool|int
+ *   TRUE on success, negative error code if something went wrong.
  */
 function aes_load_phpsec() {
 
@@ -587,18 +590,10 @@ function aes_user_alter(&$edit, $account) {
  * @see aes_user_view()
  *
  * @return bool
- *   TRUE if encrypted password is exists, FALSE otherwise.
+ *   TRUE if encrypted password is exists and decryptable, FALSE otherwise.
  */
 function aes_password_exists($uid) {
-  $result = db_query("SELECT uid FROM {aes_passwords} WHERE uid = :uid", array(':uid' => $uid));
-  $user = $result->fetchAssoc();
-
-  if (!empty($user)) {
-    return TRUE;
-  }
-  else {
-    return FALSE;
-  }
+  return aes_get_password($uid) ? TRUE : FALSE;
 }
 
 /**
@@ -628,20 +623,19 @@ function aes_password_exists($uid) {
  *   The password in plain text on success, FALSE otherwise.
  */
 function aes_get_password($uid, $decrypt = FALSE) {
-  $result = db_query("SELECT pass FROM {aes_passwords} WHERE uid = :uid", array(':uid' => $uid));
-  $user = $result->fetchAssoc();
+  $password = db_select('aes_passwords', 'p')
+    ->fields('p', array('pass'))
+    ->condition('uid', $uid)
+    ->execute()
+    ->fetchField();
 
-  if (empty($user)) {
+  if (empty($password)) {
     return FALSE;
   }
-  else {
-    if ($decrypt) {
-      return aes_decrypt($user['pass']);
-    }
-    else {
-      return $user['pass'];
-    }
+  if ($decrypt) {
+    return aes_decrypt($password);
   }
+  return $password;
 }
 
 /**
