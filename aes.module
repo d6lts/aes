@@ -914,14 +914,14 @@ function aes_encrypt($string, $base64encode = TRUE, $custom_key = NULL, $custom_
  */
 function aes_decrypt($string, $base64encoded = TRUE, $custom_key = NULL, $custom_cipher = NULL, $custom_iv = NULL, $custom_implementation = NULL) {
 
+  if ($base64encoded) {
+    $string = base64_decode($string);
+  }
+
   // Bail out if the passed string is empty.
   if (empty($string)) {
     watchdog("aes", "Tried to decrypt an empty string.", array(), WATCHDOG_WARNING);
     return FALSE;
-  }
-
-  if ($base64encoded) {
-    $string = base64_decode($string);
   }
 
   if ($custom_cipher != NULL) {
