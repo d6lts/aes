@@ -43,3 +43,14 @@ Something you should pay attention to (if you want any sort of security) is how 
 UPGRADING FROM 1.3 OR EARLIER
 ----------------------
 If you're upgrading from an earlier version than 1.4, and don't want to change anything, then just stick with the Mcrypt implementation since that is the (only) implementation this module used in earlier versions. It should be selected as default when you install/upgrade (remember to run update.php).
+
+TODO
+____
+Ideas for 7.x-2.x
+- PHPSecLib currently supported IV so usage setIV() should be added;
+  the adding itself is easy, backward compatibility is an issue;
+- Ability to manually update IV. Check for correct number of bytes;
+- Here is an example of having same result by different implementation:
+  http://stackoverflow.com/questions/9305781/cant-get-the-same-result-for-encryption-with-mcrypt-and-phpseclib
+  cannot reproduce the same for 256 bits;
+- Optionally(?) store IV together with encoded data, like <hex-iv>~<base64-encrypted>

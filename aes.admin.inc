@@ -35,13 +35,7 @@ function aes_config() {
   }
 
   $form = array();
-  $form['aes'] = array(
-    '#type' => 'fieldset',
-    '#title' => t('AES settings'),
-    '#collapsible' => FALSE,
-  );
-
-  $form['aes']['aes_convert'] = array(
+  $form['aes_convert'] = array(
     '#type' => 'checkbox',
     '#title' => t('Create AES passwords'),
     '#default_value' => variable_get("aes_convert", FALSE),
@@ -71,7 +65,7 @@ function aes_config() {
     drupal_set_message(t("You do not have an AES implementation installed!"), "error");
   }
 
-  $form['aes']['aes_implementation'] = array(
+  $form['aes_implementation'] = array(
     '#type' => 'select',
     '#title' => t('AES implementation'),
     '#options' => $encryption_implementations,
@@ -79,7 +73,7 @@ function aes_config() {
     '#description' => $implementations_description,
   );
 
-  $form['aes']['view_method'] = array(
+  $form['view_method'] = array(
     '#type' => 'select',
     '#title' => t('Method for viewing passwords'),
     '#options' => array(
@@ -103,7 +97,7 @@ function aes_config() {
     $cipher_description = "";
   }
 
-  $form['aes']['aes_cipher'] = array(
+  $form['aes_cipher'] = array(
     '#type' => 'select',
     '#title' => t('Cipher'),
     '#options' => array(
@@ -116,7 +110,21 @@ function aes_config() {
     '#description' => $cipher_description,
   );
 
-  $form['aes']['aes_key_storage_method'] = array(
+  $iv = base64_decode(variable_get("aes_encryption_iv", ""));
+  $iv = empty($iv)
+    ? 'Not defined'
+    : 'Base64: ' . variable_get("aes_encryption_iv") . "\r\nHex: 0x" . strtoupper(bin2hex($iv));
+
+  $form['iv'] = array(
+    '#type' => 'textarea',
+    '#title' => t('Initialization vector'),
+    '#description' => t("The value used to encrypt and decrypt message. Less secure than key. Should be exposed among with encoded data when encoding is passed to an external system. Currently fully supported by MCrypt mode, with PHPSecLib used only for custom calls."),
+    '#disabled' => TRUE,
+    '#default_value' => $iv,
+    '#rows' => 2,
+  );
+
+  $form['aes_key_storage_method'] = array(
     '#type' => 'select',
     '#title' => t('Key storage method'),
     '#options' => array('Database' => 'Database', 'File' => 'File'),
@@ -124,25 +132,25 @@ function aes_config() {
     '#description' => t('If possible, you should use the file storage method and assign a path below.'),
   );
 
-  $form['aes']['aes_key_path'] = array(
+  $form['aes_key_path'] = array(
     '#type' => 'textfield',
     '#title' => t('Path to keyfile'),
     '#default_value' => variable_get("aes_key_path", ""),
     '#description' => t('The path, including the filename, of the file in which to store your key. The access restrictions on this file should be set as high as possible while still allowing webserver read/write access.'),
   );
 
-  $form['aes']['aes_key'] = array(
+  $form['aes_key'] = array(
     '#type' => 'password',
     '#title' => t('Key'),
     '#description' => t("The key for your encryption system. You normally don't need to worry about this since this module will generate a key for you if none is specified. However you have the option of using your own custom key here."),
   );
 
-  $form['aes']['aes_key_c'] = array(
+  $form['aes_key_c'] = array(
     '#type' => 'password',
     '#title' => t('Confirm key'),
   );
 
-  $form['aes']['submit'] = array(
+  $form['submit'] = array(
     '#type' => 'submit',
     '#value' => t('Save'),
   );
@@ -165,7 +173,7 @@ function aes_config_validate($form, &$form_state) {
     }
   }
 
-  // If the storage method is set to File, check that the file can be openend
+  // If the storage method is set to File, ensure the file can be opened.
   // for writing
   if ($form_state['values']['aes_key_storage_method'] == "File") {
     $fp = @fopen($form_state['values']['aes_key_path'], "a");
@@ -177,7 +185,6 @@ function aes_config_validate($form, &$form_state) {
       fclose($fp);
     }
   }
-
 }
 
 /**

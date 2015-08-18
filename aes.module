@@ -410,6 +410,7 @@ function aes_delete_key($storage_method) {
 function aes_make_key() {
   $chars = 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ1234567890';
 
+  srand();
   while (TRUE) {
     $key = '';
     while (strlen($key) < 32) {
@@ -449,6 +450,7 @@ function aes_make_iv($ignore_implementation = FALSE) {
 
   if (strtoupper(substr(PHP_OS, 0, 3)) === "WIN") {
     $randgen = MCRYPT_RAND;
+    srand();
   }
   else {
     $randgen = MCRYPT_DEV_URANDOM;
@@ -518,13 +520,13 @@ function aes_encrypt($string, $base64encode = TRUE, $custom_key = NULL, $custom_
     if (is_null($custom_cipher) == FALSE) {
       watchdog("aes", "A custom cipher was defined when encrypting a string in the AES module using the phpseclib implementation. This implementation doesn't support custom ciphers therefore the argument was ignored and the encryption was done with the standard cipher.", array(), WATCHDOG_WARNING);
     }
-    if (is_null($custom_iv) == FALSE) {
-      watchdog("aes", "A custom IV was defined when encrypting a string in the AES module using the phpseclib implementation. This implementation doesn't support custom IV's therefore the argument was ignored and the encryption was done with the standard IV.", array(), WATCHDOG_WARNING);
-    }
 
     aes_load_phpsec();
     $phpsec = new Crypt_AES();
     $phpsec->setKey($key);
+    if (!is_null($custom_iv)) {
+      $phpsec->setIV($custom_iv);
+    }
     $encrypted = $phpsec->encrypt($string);
 
   }
@@ -636,13 +638,13 @@ function aes_decrypt($string, $base64encoded = TRUE, $custom_key = NULL, $custom
     if (is_null($custom_cipher) == FALSE) {
       watchdog("aes", "A custom cipher was defined when decrypting a string in the AES module using the phpseclib implementation. This implementation doesn't support custom ciphers therefore the argument was ignored and the decryption was done with the standard cipher.", array(), WATCHDOG_WARNING);
     }
-    if (is_null($custom_iv) == FALSE) {
-      watchdog("aes", "A custom IV was defined when decrypting a string in the AES module using the phpseclib implementation. This implementation doesn't support custom IV's therefore the argument was ignored and the decryption was done with the standard IV.", array(), WATCHDOG_WARNING);
-    }
 
     aes_load_phpsec();
     $phpsec = new Crypt_AES();
     $phpsec->setKey($key);
+    if (!is_null($custom_iv)) {
+      $phpsec->setIV($custom_iv);
+    }
     $decrypted = $phpsec->decrypt($string);
   }
   else {
