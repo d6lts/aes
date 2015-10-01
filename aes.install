@@ -67,14 +67,14 @@ function aes_enable() {
   }
 
   $aes_implementations = aes_get_available_aes_implementations();
-  if ($aes_implementations['mcrypt']) {
-    variable_set("aes_implementation", "mcrypt");
-    $install_msg = t("AES enabled using the MCrypt implementation.");
+  if ($aes_implementations['phpseclib']) {
+    variable_set("aes_implementation", "phpseclib");
+    $install_msg = t("AES enabled using the phpseclib implementation.");
   }
   else {
-    if ($aes_implementations['phpseclib']) {
-      variable_set("aes_implementation", "phpseclib");
-      $install_msg = t("AES enabled using the phpseclib implementation.");
+    if ($aes_implementations['mcrypt']) {
+      variable_set("aes_implementation", "mcrypt");
+      $install_msg = t("AES enabled using the MCrypt implementation.");
     }
     else {
       // This case shouldn't actually be possible since hook_requirements should stop the installation if there's no implementation.
