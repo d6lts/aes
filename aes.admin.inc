@@ -285,12 +285,24 @@ function aes_config_submit($form, &$form_state) {
       // since it's the only one phpseclib supports.
       variable_set("aes_cipher", "rijndael-128");
       $encrypt_params['custom_cipher'] = "rijndael-128";
+    }
+
+    $iv = base64_decode(variable_get("aes_encryption_iv", ""));
+    if (empty($iv)) {
       // Create a new IV, this IV won't actually be used by phpseclib, but it's
-      // needed if the implementation is switched back to mcrypt.
+      // needed if the implementation is switched to mcrypt.
       aes_make_iv(TRUE);
       $encrypt_params['custom_iv'] = variable_get("aes_encryption_iv");
     }
     drupal_set_message(t("Implementation changed."));
+  }
+
+  // So far think of PHPSecLib as something not using IV by default.
+  if ($decrypt_params['custom_implementation'] == 'phpseclib') {
+    $decrypt_params['custom_iv'] = NULL;
+  }
+  if ($encrypt_params['custom_implementation'] == 'phpseclib') {
+    $encrypt_params['custom_iv'] = NULL;
   }
 
   if ($do_reencypt) {

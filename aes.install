@@ -84,11 +84,9 @@ function aes_enable() {
   }
   drupal_set_message($install_msg);
 
-  if (variable_get("aes_implementation", "mcrypt") == "mcrypt") {
-    $iv = base64_decode(variable_get("aes_encryption_iv", FALSE));
-    if (empty($iv)) {
-      aes_make_iv();
-    }
+  $iv = base64_decode(variable_get("aes_encryption_iv", FALSE));
+  if (empty($iv)) {
+    aes_make_iv(TRUE);
   }
   // This will create a new key if one doesn't exist.
   aes_get_key();
