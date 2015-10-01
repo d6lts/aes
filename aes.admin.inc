@@ -86,17 +86,6 @@ function aes_config() {
     '#description' => t('Whether to show the password as an in-place AJAX field on the user info page or on a separate page with a tab on the user page, both, or neither.'),
   );
 
-  if (variable_get("aes_implementation", "mcrypt") == "phpseclib") {
-    $cipher_select_value = "rijndael-128";
-    $cipher_select_disabled = TRUE;
-    $cipher_description = t("Cipher is locked to Rijndael 128 when using the phpseclib implementation.");
-  }
-  else {
-    $cipher_select_value = variable_get("aes_cipher", "rijndael-128");
-    $cipher_select_disabled = FALSE;
-    $cipher_description = "";
-  }
-
   $form['aes_cipher'] = array(
     '#type' => 'select',
     '#title' => t('Cipher'),
@@ -105,9 +94,23 @@ function aes_config() {
       'rijndael-192' => 'Rijndael 192',
       'rijndael-256' => 'Rijndael 256'
     ),
-    '#default_value' => $cipher_select_value,
-    '#disabled' => $cipher_select_disabled,
-    '#description' => $cipher_description,
+    '#default_value' => variable_get("aes_cipher", "rijndael-128"),
+    '#states' => array(
+      'invisible' => array(
+        ':input[name="aes_implementation"]' => array('value' => 'phpseclib'),
+      ),
+    ),
+  );
+
+  $form['aes_cipher_notice'] = array(
+    '#type' => 'item',
+    '#title' => t('Cipher'),
+    '#markup' => t("Is locked to Rijndael 128 when using the phpseclib implementation.") . "<br/>",
+    '#states' => array(
+      'visible' => array(
+        ':input[name="aes_implementation"]' => array('value' => 'phpseclib'),
+      ),
+    ),
   );
 
   $iv = base64_decode(variable_get("aes_encryption_iv", ""));
@@ -205,6 +208,11 @@ function aes_config_submit($form, &$form_state) {
       variable_set("aes_convert", FALSE);
       drupal_set_message(t("Creation of encrypted passwords disabled."));
     }
+  }
+
+  // Fulfill our promise if needed: PHPSecLib is locked to 128bits.
+  if ($form_state['values']['aes_cipher'] == 'phpseclib') {
+    $form_state['values']['aes_cipher'] = 'rijndael-128';
   }
 
   // Check if the storage method or key path has changed.
