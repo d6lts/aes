@@ -21,6 +21,12 @@ If you don't have any of them, then read the next section below.
 
 Also note that although this module SHOULD work on Windows, it has only been tested on Linux.
 
+Drupal 8 version is required presence of 'active' configuration in setings.php file. Having configuration in file going
+to be deprecated one day, but so far this works nicely. Just add to your config file something like
+  $config_directories['active'] = '/path/to/store/keys/outside/webroot';
+
+It is assumed keys and other related info should not be stored keys in the database.
+
 HOW TO GET AN AES IMPLEMENTATION
 ----------------------
 If you don't have an AES implementation (you'll notice this when you install this module) then the easiest

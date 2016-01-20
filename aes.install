@@ -1,7 +1,7 @@
 <?php
 /**
  * @file
- * Install/uninstall aes related functions.
+ * Install/uninstall handling for AES.
  */
 
 use Drupal\aes\AES;
@@ -17,7 +17,7 @@ use Drupal\Core\Config\FileStorageFactory;
 function aes_requirements($phase) {
   $aesImplementations = AES::get_available_implementations();
 
-  if ($aesImplementations['mcrypt'] === FALSE && $aesImplementations['phpseclib'] === FALSE) {
+  if ($aesImplementations['mcrypt'] === false && $aesImplementations['phpseclib'] === false) {
     $requirementSeverity = REQUIREMENT_ERROR;
     $value = t('The AES encryption module requires at least one of two things to function: Either the PHP Mcrypt extension has to be installed on the web server, or the PHP Secure Communications Library (phpseclib) needs to be installed in the AES directory. Check the README.txt for more information.');
   }
@@ -36,8 +36,24 @@ function aes_requirements($phase) {
     }
   }
 
-  $requirements['aes'] = array(
-    'title' => t('AES encryption implementation'),
+  $requirements['aes_lib'] = array(
+    'title'    => t('[AES encryption implementation]'),
+    'value'    => $value,
+    'severity' => $requirementSeverity,
+  );
+
+  $requirementSeverity = REQUIREMENT_OK;
+  $value = t("The 'active' config directory found.");
+  try {
+    config_get_config_directory(CONFIG_ACTIVE_DIRECTORY);
+  }
+  catch (\Exception $e) {
+    $requirementSeverity = REQUIREMENT_ERROR;
+    $value = t("Requirements error - cannot install AES: No 'active' config directory found. Please define it in your settings.php file.");
+  }
+
+  $requirements['aes_config_dir'] = array(
+    'title' => t('[AES config directory]'),
     'value' => $value,
     'severity' => $requirementSeverity,
   );
