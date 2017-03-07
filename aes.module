@@ -7,6 +7,7 @@
 */
 
 define("AES_PASSWORD_MAX_LENGTH", 128);
+define("AES_VERSION_MAGIC_BYTES", "aes-d6lts1\x1a");
 
 function aes_menu() {
  
@@ -331,11 +332,27 @@ function aes_get_password($uid, $decrypt = false) {
  }
 }
 
-function aes_get_key() {
- $storage_method = variable_get("aes_key_storage_method", "database");
+function aes_get_key($legacy = FALSE) {
+ $variables = array(
+  'aes_key_storage_method' => 'Database',
+  'aes_key' => FALSE,
+  'aes_key_path' => '',
+ );
+ foreach ($variables as $name => $default) {
+  // We always get the primary variable -- it'll be used even in a legacy
+  // context, if the user hasn't run hook_update_N().
+  $variables[$name] = variable_get($name, $default);
+  
+  if ($legacy) {
+    // Prefer the '_legacy' version, though, in a legacy context.
+    $variables[$name] = variable_get($name . '_legacy', $variables[$name]);
+  }
+ }
+
+ $storage_method = $variables['aes_key_storage_method'];
  
  if ($storage_method == "Database") {
-  $key = variable_get("aes_key", false);
+  $key = $variables['aes_key'];
   if ($key === false) {
    $key = aes_make_key();
    aes_store_key($key);
@@ -343,12 +360,18 @@ function aes_get_key() {
   }
  }
  if ($storage_method == "File") {
-  $key = file_get_contents(variable_get("aes_key_path", ""));
+  $key = file_get_contents($variables['aes_key_path']);
   if ($key === false) {
    $key = aes_make_key();
    aes_store_key($key);
    watchdog("aes", "AES module made a new key since one couldn't be found by using the file storage method.");
   }
+ }
+
+ // We need to base64 decode the key (if not in a legacy context, where
+ // alphanumeric keys were used).
+ if (!empty($key) && !$legacy) {
+  $key = base64_decode($key);
  }
  
  return $key;
@@ -357,6 +380,8 @@ function aes_get_key() {
 function aes_store_key($key) {
  $storage_method = variable_get("aes_key_storage_method", "Database");
  
+ $key = base64_encode($key);
+
  if ($storage_method == "Database") {
   variable_set("aes_key", $key);
  }
@@ -430,21 +455,31 @@ function aes_encrypt($string, $base64encode = true, $custom_key = null, $custom_
  
  $key = !empty($custom_key) ? $custom_key : aes_get_key();
  
- aes_load_phpsec();
- include_once('Crypt/Random.php');
+ if (aes_load_phpsec() === TRUE) {
+  include_once('Crypt/Random.php');
 
- $phpsec = new Crypt_AES();
- $phpsec->setKey($key);
- $iv = crypt_random_string($phpsec->getBlockLength() >> 3);
- $phpsec->setIV($iv);
+  $phpsec = new Crypt_AES();
+  $phpsec->setKey($key);
+  $iv = crypt_random_string($phpsec->getBlockLength() >> 3);
+  $phpsec->setIV($iv);
 
- $encrypted = "aes-d6lts1\x1a" . $iv . $phpsec->encrypt($string);
-  
- if($base64encode) {
-  return base64_encode($encrypted);
+  $encrypted = AES_VERSION_MAGIC_BYTES . $iv . $phpsec->encrypt($string);
+   
+  if($base64encode) {
+   return base64_encode($encrypted);
+  }
+  else {
+   return $encrypted;
+  }
  }
  else {
-  return $encrypted;
+  $error_msg = t("Request was sent to encrypt a string with the AES module, but phpseclib couldn't be found.");
+  
+  if(user_access('administer aes')) {
+   drupal_set_message($error_msg, "error");
+  }
+  watchdog("aes", $error_msg, array(), WATCHDOG_ERROR);
+  return false;
  }
 }
 
@@ -481,25 +516,35 @@ function aes_decrypt($string, $base64encoded = true, $custom_key = null, $custom
  }
 
  $version = substr($string, 0, 11);
- if ($version != "aes-d6lts1\x1a") {
+ if ($version != AES_VERSION_MAGIC_BYTES) {
   return aes_decrypt_legacy($string, FALSE, $custom_key, $custom_cipher, $custom_iv, $custom_implementation);
  }
  $string = substr($string, 11);
 
  $key = !empty($custom_key) ? $custom_key : aes_get_key();
 
- aes_load_phpsec();
- $phpsec = new Crypt_AES();
+ if (aes_load_phpsec() === TRUE) {
+  $phpsec = new Crypt_AES();
 
- $iv_length = $phpsec->getBlockLength() >> 3;
- $iv = substr($string, 0, $iv_length);
- $string = substr($string, $iv_length);
- 
- $phpsec->setKey($key);
- $phpsec->setIV($iv);
- $decrypted = $phpsec->decrypt($string);
+  $iv_length = $phpsec->getBlockLength() >> 3;
+  $iv = substr($string, 0, $iv_length);
+  $string = substr($string, $iv_length);
+  
+  $phpsec->setKey($key);
+  $phpsec->setIV($iv);
+  $decrypted = $phpsec->decrypt($string);
 
- return trim($decrypted);
+  return trim($decrypted);
+ }
+ else {
+  $error_msg = t("Request was sent to decrypt a string with the AES module, but phpseclib couldn't be found.");
+  
+  if(user_access('administer aes')) {
+   drupal_set_message($error_msg, "error");
+  }
+  watchdog("aes", $error_msg, array(), WATCHDOG_ERROR);
+  return false;
+ }
 }
 
 /**
@@ -538,7 +583,7 @@ function aes_encrypt_legacy($string, $base64encode = true, $custom_key = null, $
   $key = $custom_key;
  }
  else {
-  $key = aes_get_key();
+  $key = aes_get_key(TRUE);
  }
  
  if (is_null($custom_implementation) == false && ($custom_implementation == "mcrypt" || $custom_implementation == "phpseclib")) {
@@ -650,7 +695,7 @@ function aes_decrypt_legacy($string, $base64encoded = true, $custom_key = null, 
   $key = $custom_key;
  }
  else {
-  $key = aes_get_key();
+  $key = aes_get_key(TRUE);
  }
  
  if (is_null($custom_implementation) == false && ($custom_implementation == "mcrypt" || $custom_implementation == "phpseclib")) {
