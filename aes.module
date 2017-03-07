@@ -391,44 +391,9 @@ function aes_delete_key($storage_method) {
 }
 
 function aes_make_key() {
- 
- $acceptable = false;
- 
- $chars = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ1234567890";
- 
- while ($acceptable === false) {
-  
-  $key = "";
-  
-  while (strlen($key) < 32) {
-   $key .= substr($chars, rand(0, strlen($chars)), 1);
-  }
-  
-  $acceptable = true;
-  
-  //is there at least one lowercase letter?
-  $result = preg_match("/.*[a-z].*/", $key);
-  
-  if($result == 0) {
-   $acceptable = false;
-  }
-  
-  //is there at least one uppercase letter?
-  $result = preg_match("/.*[A-Z].*/", $key);
-  
-  if($result == 0) {
-   $acceptable = false;
-  }
-  
-  //is there at least one numeric?
-  $result = preg_match("/.*[0-9].*/", $key);
-  
-  if($result == 0) {
-   $acceptable = false;
-  }
- }
- 
- return $key;
+ aes_load_phpsec();
+ include_once('Crypt/Random.php');
+ return crypt_random_string(32);
 }
 
 function aes_make_iv($ignore_implementation = false) {
