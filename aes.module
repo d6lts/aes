@@ -742,35 +742,8 @@ function aes_encrypt_legacy($string, $base64encode = true, $custom_key = null, $
  }
 }
 
-
 function aes_enable() {
- 
- if(extension_loaded("mcrypt") === false && aes_load_phpsec() === false) {
-  drupal_set_message(t("The AES encryption module requires at least one of two things to function: Either the PHP Mcrypt extension has to be installed on the web server. Or the PHP Secure Communications Library (phpseclib) needs to be present in the AES directory. Installing phpseclib is probably the easiest thing to do, you can download a copy at http://phpseclib.sourceforge.net/. Extract the zip file into a directory named \"phpseclib\" inside the \"aes\" module directory and you should be good to go. Check the README.txt for more information."), "warning");
- }
- 
- //choose an implementation
- if(extension_loaded("mcrypt") === true && aes_load_phpsec() !== true) {
-  variable_set("aes_implementation", "mcrypt");
- }
- else if(extension_loaded("mcrypt") === false && aes_load_phpsec() === true) {
-  variable_set("aes_implementation", "phpseclib");
- }
- else if(extension_loaded("mcrypt") === true && aes_load_phpsec() === true) {
-  variable_set("aes_implementation", "mcrypt");
- }
- else {
-  variable_set("aes_implementation", "missing");
- }
- 
- if(variable_get("aes_implementation", "mcrypt")  == "mcrypt") {
-  $iv = base64_decode(variable_get("aes_encryption_iv", ""));
-  if (empty($iv)) {
-   aes_make_iv();
-  }
- }
- 
- //this will create a new key if one doesn't exist
+ // This will create a new key if one doesn't exist.
  aes_get_key();
- 
 }
+
