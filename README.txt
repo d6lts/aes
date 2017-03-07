@@ -13,16 +13,16 @@ REQUIREMENTS
 This module requires at least PHP 5.2 and the PHP Secure Communications Library
 (phpseclib).
 
-Just download the latest version from http://phpseclib.sourceforge.net/ and
-extract it into a directory called "phpseclib" inside the aes directory. Note
-that the zip file of the version of phpseclib that this module was developed
-with doesn't create the phpseclib directory itself, it just extracts its various
-directories directly into the location you unzip it, so create that "phpseclib"
-directory first and then move the zip file into it, and unzip. The complete path
-to the file which will be included by this module (AES.php) should look like
-this:
+Just download the latest 1.x version from https://github.com/phpseclib/phpseclib
+and extract it into a directory called "phpseclib" inside the aes directory.
+Note that the zip file of the version of phpseclib that this module was
+developed with doesn't create the phpseclib directory itself, it just extracts
+its various directories directly into the location you unzip it, so create that
+"phpseclib" directory first and then move the zip file into it, and unzip. The
+complete path to the file which will be included by this module (AES.php) should
+look like this:
 
-  aes/phpseclib/Crypt/AES.php
+  aes/phpseclib/phpseclib/Crypt/AES.php
 
 That's it! Try installing/enabling the module again.
 
