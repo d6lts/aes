@@ -526,12 +526,12 @@ function aes_decrypt($string, $base64encoded = true, $custom_key = null, $custom
 
  if (aes_load_phpsec() === TRUE) {
   $phpsec = new Crypt_AES();
+  $phpsec->setKey($key);
 
   $iv_length = $phpsec->getBlockLength() >> 3;
   $iv = substr($string, 0, $iv_length);
   $string = substr($string, $iv_length);
   
-  $phpsec->setKey($key);
   $phpsec->setIV($iv);
   $decrypted = $phpsec->decrypt($string);
 
