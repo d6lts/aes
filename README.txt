@@ -7,6 +7,14 @@ This module can basically be useful in 2 ways:
 1. For making your users passwords readable by admins.
 2. As a very simple general purpose AES encryption API to use in other modules.
 
+Note: While this module does AES encryption, it does NOT do integrity validation
+with an HMAC. This means you can safely store or send encrypted data, but if you
+provide a public end-point which can receive encrypted data and presents an
+error message if it's not correctly padded, then it will be vulnerable to a
+"Padding oracle attack":
+
+  https://en.wikipedia.org/wiki/Padding_oracle_attack
+
 REQUIREMENTS
 ----------------------
 
