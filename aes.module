@@ -460,14 +460,21 @@ function aes_encrypt($string, $base64encode = true, $custom_key = null, $custom_
  $key = !empty($custom_key) ? $custom_key : aes_get_key();
 
  if (strlen($key) !== AES_KEY_BYTE_SIZE) {
-   throw new Exception("AES: Key is the wrong size.");
+  watchdog("aes", "Key is the wrong size.", array(), WATCHDOG_ERROR);
+  return FALSE;
  }
  
  if (aes_load_phpsec() === TRUE) {
   include_once('Crypt/Random.php');
 
   // Derive an encryption key from the master key.
-  $encrypt_key = aes_hkdf($key, AES_KEY_BYTE_SIZE, AES_HKDF_ENCRYPTION_INFO);
+  try {
+   $encrypt_key = aes_hkdf($key, AES_KEY_BYTE_SIZE, AES_HKDF_ENCRYPTION_INFO);
+  }
+  catch (Exception $e) {
+   watchdog("aes", $e->getMessage(), array(), WATCHDOG_ERROR);
+   return FALSE;
+  }
 
   $phpsec = new Crypt_AES();
   $phpsec->setKey($encrypt_key);
@@ -478,7 +485,14 @@ function aes_encrypt($string, $base64encode = true, $custom_key = null, $custom_
   $encrypted = $iv . $phpsec->encrypt($string);
 
   // Derive an authentication key from the master key.
-  $akey = aes_hkdf($key, AES_KEY_BYTE_SIZE, AES_HKDF_AUTHENTICATION_INFO);
+  try {
+   $akey = aes_hkdf($key, AES_KEY_BYTE_SIZE, AES_HKDF_AUTHENTICATION_INFO);
+  }
+  catch (Exception $e) {
+   watchdog("aes", $e->getMessage(), array(), WATCHDOG_ERROR);
+   return FALSE;
+  }
+
   $hmac = hash_hmac(AES_MAC_HASH, $encrypted, $akey, TRUE);
 
   $encrypted = AES_MAGIC_BYTES_VERSION1 . $hmac . $encrypted;
@@ -541,7 +555,8 @@ function aes_decrypt($string, $base64encoded = true, $custom_key = null, $custom
  $string = substr($string, 11);
 
  if (strlen($string) < AES_MAC_BYTE_SIZE) {
-   throw new Exception("Ciphertext is too short.");
+  watchdog("aes", "Ciphertext is too short.", array(), WATCHDOG_ERROR);
+  return FALSE;
  }
 
  $hmac = substr($string, 0, AES_MAC_BYTE_SIZE);
@@ -552,12 +567,24 @@ function aes_decrypt($string, $base64encoded = true, $custom_key = null, $custom
 
  // Derive an authentication key from the master key and verify message
  // authenticity.
- $akey = aes_hkdf($key, AES_KEY_BYTE_SIZE, AES_HKDF_AUTHENTICATION_INFO);
+ try {
+  $akey = aes_hkdf($key, AES_KEY_BYTE_SIZE, AES_HKDF_AUTHENTICATION_INFO);
+ }
+ catch (Exception $e) {
+  watchdog("aes", $e->getMessage(), array(), WATCHDOG_ERROR);
+  return FALSE;
+ }
 
  if (aes_verify_hmac($hmac, $ciphertext, $akey)) {
 
    // Derive an encryption key from the master key to use for decryption.
-   $ekey = aes_hkdf($key, AES_KEY_BYTE_SIZE, AES_HKDF_ENCRYPTION_INFO);
+   try {
+    $ekey = aes_hkdf($key, AES_KEY_BYTE_SIZE, AES_HKDF_ENCRYPTION_INFO);
+   }
+   catch (Exception $e) {
+    watchdog("aes", $e->getMessage(), array(), WATCHDOG_ERROR);
+    return FALSE;
+   }
 
    if (aes_load_phpsec() === TRUE) {
      $phpsec = new Crypt_AES();
@@ -566,7 +593,8 @@ function aes_decrypt($string, $base64encoded = true, $custom_key = null, $custom
      $iv_length = $phpsec->getBlockLength() >> 3;
 
      if (strlen($ciphertext) < $iv_length) {
-       throw new Exception('Ciphertext is too short.');
+      watchdog("aes", "Ciphertext is too short.", array(), WATCHDOG_ERROR);
+      return FALSE;
      }
 
      $iv = substr($ciphertext, 0, $iv_length);
@@ -574,7 +602,8 @@ function aes_decrypt($string, $base64encoded = true, $custom_key = null, $custom
      $ciphertext = substr($ciphertext, $iv_length);
 
      if ($string === '') {
-       throw new Exception('Ciphertext is too short.');
+      watchdog("aes", "Ciphertext is too short.", array(), WATCHDOG_ERROR);
+      return FALSE;
      }
 
      $phpsec->setIV($iv);
@@ -593,7 +622,8 @@ function aes_decrypt($string, $base64encoded = true, $custom_key = null, $custom
    }
  }
  else {
-   throw new Exception('AES: Integrity check failed.');
+   watchdog("aes", "Integrity check failed.", array(), WATCHDOG_ERROR);
+   return FALSE;
  }
 }
 
@@ -870,7 +900,8 @@ function aes_verify_hmac($hmac, $message, $key) {
   }
 
   if (strlen($hmac) !== strlen($message_hmac)) {
-    throw new Exception('Calculated and given HMAC are not the same size.');
+    // Calculated and given HMAC are not the same size.
+    return FALSE;
   }
 
   // HMAC the hashes with a random key to prevent leaking useful timing
