@@ -8,6 +8,11 @@
 
 define("AES_PASSWORD_MAX_LENGTH", 128);
 define("AES_MAGIC_BYTES_VERSION1", "aes-d6lts1\x1a");
+define('AES_KEY_BYTE_SIZE', 16);
+define('AES_MAC_HASH', 'sha256');
+define('AES_MAC_BYTE_SIZE', 32);
+define('AES_HKDF_ENCRYPTION_INFO', 'Drupal|AES|KeyForEncryption');
+define('AES_HKDF_AUTHENTICATION_INFO', 'Drupal|AES|KeyForAuthentication');
 
 function aes_menu() {
  
@@ -417,9 +422,7 @@ function aes_delete_key($storage_method) {
 }
 
 function aes_make_key() {
- aes_load_phpsec();
- include_once('Crypt/Random.php');
- return crypt_random_string(32);
+ return drupal_random_bytes(AES_KEY_BYTE_SIZE);
 }
 
 function aes_make_iv($ignore_implementation = false) {
@@ -455,17 +458,31 @@ function aes_encrypt($string, $base64encode = true, $custom_key = null, $custom_
  }
  
  $key = !empty($custom_key) ? $custom_key : aes_get_key();
+
+ if (strlen($key) !== AES_KEY_BYTE_SIZE) {
+   throw new Exception("AES: Key is the wrong size.");
+ }
  
  if (aes_load_phpsec() === TRUE) {
   include_once('Crypt/Random.php');
 
+  // Derive an encryption key from the master key.
+  $encrypt_key = aes_hkdf($key, AES_KEY_BYTE_SIZE, AES_HKDF_ENCRYPTION_INFO);
+
   $phpsec = new Crypt_AES();
-  $phpsec->setKey($key);
-  $iv = crypt_random_string($phpsec->getBlockLength() >> 3);
+  $phpsec->setKey($encrypt_key);
+  $iv = drupal_random_bytes($phpsec->getBlockLength() >> 3);
+
   $phpsec->setIV($iv);
 
-  $encrypted = AES_MAGIC_BYTES_VERSION1 . $iv . $phpsec->encrypt($string);
-   
+  $encrypted = $iv . $phpsec->encrypt($string);
+
+  // Derive an authentication key from the master key.
+  $akey = aes_hkdf($key, AES_KEY_BYTE_SIZE, AES_HKDF_AUTHENTICATION_INFO);
+  $hmac = hash_hmac(AES_MAC_HASH, $encrypted, $akey, TRUE);
+
+  $encrypted = AES_MAGIC_BYTES_VERSION1 . $hmac . $encrypted;
+
   if($base64encode) {
    return base64_encode($encrypted);
   }
@@ -520,31 +537,63 @@ function aes_decrypt($string, $base64encoded = true, $custom_key = null, $custom
  if ($version != AES_MAGIC_BYTES_VERSION1) {
   return aes_decrypt_legacy($string, FALSE, $custom_key, $custom_cipher, $custom_iv, $custom_implementation);
  }
+ // Remove magic bytes.
  $string = substr($string, 11);
+
+ if (strlen($string) < AES_MAC_BYTE_SIZE) {
+   throw new Exception("Ciphertext is too short.");
+ }
+
+ $hmac = substr($string, 0, AES_MAC_BYTE_SIZE);
+
+ $ciphertext = substr($string, AES_MAC_BYTE_SIZE);
 
  $key = !empty($custom_key) ? $custom_key : aes_get_key();
 
- if (aes_load_phpsec() === TRUE) {
-  $phpsec = new Crypt_AES();
-  $phpsec->setKey($key);
+ // Derive an authentication key from the master key and verify message
+ // authenticity.
+ $akey = aes_hkdf($key, AES_KEY_BYTE_SIZE, AES_HKDF_AUTHENTICATION_INFO);
 
-  $iv_length = $phpsec->getBlockLength() >> 3;
-  $iv = substr($string, 0, $iv_length);
-  $string = substr($string, $iv_length);
-  
-  $phpsec->setIV($iv);
-  $decrypted = $phpsec->decrypt($string);
+ if (aes_verify_hmac($hmac, $ciphertext, $akey)) {
 
-  return trim($decrypted);
+   // Derive an encryption key from the master key to use for decryption.
+   $ekey = aes_hkdf($key, AES_KEY_BYTE_SIZE, AES_HKDF_ENCRYPTION_INFO);
+
+   if (aes_load_phpsec() === TRUE) {
+     $phpsec = new Crypt_AES();
+     $phpsec->setKey($ekey);
+
+     $iv_length = $phpsec->getBlockLength() >> 3;
+
+     if (strlen($ciphertext) < $iv_length) {
+       throw new Exception('Ciphertext is too short.');
+     }
+
+     $iv = substr($ciphertext, 0, $iv_length);
+
+     $ciphertext = substr($ciphertext, $iv_length);
+
+     if ($string === '') {
+       throw new Exception('Ciphertext is too short.');
+     }
+
+     $phpsec->setIV($iv);
+     $decrypted = $phpsec->decrypt($ciphertext);
+
+     return trim($decrypted);
+   }
+   else {
+     $error_msg = t("Request was sent to decrypt a string with the AES module, but phpseclib couldn't be found.");
+
+     if (user_access('administer aes')) {
+       drupal_set_message($error_msg, "error");
+     }
+     watchdog("aes", $error_msg, array(), WATCHDOG_ERROR);
+     return FALSE;
+   }
  }
  else {
-  $error_msg = t("Request was sent to decrypt a string with the AES module, but phpseclib couldn't be found.");
-  
-  if(user_access('administer aes')) {
-   drupal_set_message($error_msg, "error");
-  }
-  watchdog("aes", $error_msg, array(), WATCHDOG_ERROR);
-  return false;
+   throw new Exception('AES: Integrity check failed.');
  }
 }
 
@@ -764,5 +813,72 @@ function aes_decrypt_legacy($string, $base64encoded = true, $custom_key = null, 
 function aes_enable() {
  // This will create a new key if one doesn't exist.
  aes_get_key();
+}
+
+function aes_hkdf($ikm, $length, $info = '', $salt = null) {
+  $hash = AES_MAC_HASH;
+
+  $digest_length = AES_MAC_BYTE_SIZE;
+
+  // Sanity-check the desired output length.
+  if (empty($length) || !is_int($length) ||
+    $length < 0 || $length > 255 * $digest_length
+  ) {
+    throw new Exception("Bad output length requested of HKDF.");
+  }
+
+  // "if [salt] not provided, is set to a string of HashLen zeroes."
+  if (is_null($salt)) {
+    $salt = str_repeat("\x00", $digest_length);
+  }
+
+  // HKDF-Extract:
+  // PRK = HMAC-Hash(salt, IKM)
+  // The salt is the HMAC key.
+  $prk = hash_hmac($hash, $ikm, $salt, TRUE);
+
+  // HKDF-Expand:
+
+  // T(0) = ''
+  $t = '';
+  $last_block = '';
+  for ($block_index = 1; strlen($t) < $length; ++$block_index) {
+    // T(i) = HMAC-Hash(PRK, T(i-1) | info | 0x??)
+    $last_block = hash_hmac(
+      $hash,
+      $last_block . $info . chr($block_index),
+      $prk,
+      TRUE
+    );
+    // T = T(1) | T(2) | T(3) | ... | T(N)
+    $t .= $last_block;
+  }
+
+  // ORM = first L octets of T
+  $orm = substr($t, 0, $length);
+  if ($orm === FALSE) {
+    throw new Exception('AES module: HKDF failed.');
+  }
+  return $orm;
+}
+
+function aes_verify_hmac($hmac, $message, $key) {
+  $message_hmac = hash_hmac(AES_MAC_HASH, $message, $key, TRUE);
+
+  if (function_exists('hash_equals')) {
+    return hash_equals($message_hmac, $hmac);
+  }
+
+  if (strlen($hmac) !== strlen($message_hmac)) {
+    throw new Exception('Calculated and given HMAC are not the same size.');
+  }
+
+  // HMAC the hashes with a random key to prevent leaking useful timing
+  // information.
+  $random_key = drupal_random_bytes(AES_KEY_BYTE_SIZE);
+  $compare_hmac = hash_hmac(AES_MAC_HASH, $hmac, $random_key);
+  $compare_message = hash_hmac(AES_MAC_HASH, $message_hmac, $random_key);
+
+  return $compare_hmac === $compare_message;
 }
 
