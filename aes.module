@@ -8,7 +8,7 @@
 
 define("AES_PASSWORD_MAX_LENGTH", 128);
 define("AES_MAGIC_BYTES_VERSION1", "aes-d6lts1\x1a");
-define('AES_KEY_BYTE_SIZE', 16);
+define('AES_KEY_BYTE_SIZE', 32);
 define('AES_MAC_HASH', 'sha256');
 define('AES_MAC_BYTE_SIZE', 32);
 define('AES_HKDF_ENCRYPTION_INFO', 'Drupal|AES|KeyForEncryption');
