@@ -3,9 +3,3 @@ description = "Provides AES encryption."
 core = 6.x
 php = 4.3.0
 
-
-; Information added by Drupal 6 LTS vendors on 2017-05-23
-version = "6.x-1.5"
-core = "6.x"
-project = "aes"
-datestamp = "1495590588"
