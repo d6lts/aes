@@ -1,20 +1,19 @@
 <?php
 
 function aes_requirements($phase) {
- 
- $aes_implementations = aes_get_available_aes_implementations();
- 
- if ($aes_implementations['mcrypt'] === false && $aes_implementations['phpseclib'] === false) {
-  $requirement_severity = REQUIREMENT_ERROR;
+ include_once 'aes.module';
+
+ if (aes_load_phpsec() === TRUE) {
+  $requirement_severity = REQUIREMENT_OK;
  }
  else {
-  $requirement_severity = REQUIREMENT_OK;
+  $requirement_severity = REQUIREMENT_ERROR;
  }
  
  $requirements = array(
   array(
   'title' => 'AES encryption implementation',
-  'description' => 'The AES encryption module requires at least one of two things to function: Either the PHP Mcrypt extension has to be installed on the web server. Or the PHP Secure Communications Library (phpseclib) needs to be installed in the AES directory. Check the README.txt for more information.',
+  'description' => 'The AES encryption module requires the PHP Secure Communications Library (phpseclib) to be installed in the AES directory. Check the README.txt for more information.',
   'severity' => $requirement_severity,
   ),
  );
@@ -22,31 +21,7 @@ function aes_requirements($phase) {
  return $requirements;
 }
 
-function aes_get_available_aes_implementations() {
- 
- $phpsec_include_path = dirname(__FILE__)."/phpseclib";
- set_include_path(get_include_path() . PATH_SEPARATOR . $phpsec_include_path);
- $phpsec_available = true;
- if (file_exists($phpsec_include_path.'/Crypt/AES.php') === false) {
-  $phpsec_available = false;
- }
- else if (is_readable($phpsec_include_path.'/Crypt/AES.php') === false) {
-  $phpsec_available = false;
- }
- 
- 
- if (extension_loaded("mcrypt")) {
-  $mcrypt_available = true;
- }
- else {
-  $mcrypt_available = false;
- }
- 
- return array('mcrypt' => $mcrypt_available, 'phpseclib' => $phpsec_available);
-}
-
 function aes_install() {
-  
   drupal_install_schema("aes");
   
   variable_set("aes_key_storage_method", "Database");
@@ -54,39 +29,88 @@ function aes_install() {
   variable_set("aes_convert", "true");
   variable_set("aes_viewing_method", "collapsible");
   
-  $aes_implementations = aes_get_available_aes_implementations();
-  
-  if ($aes_implementations['mcrypt']) {
-   variable_set("aes_implementation", "mcrypt");
-   $install_msg = t("AES installed using the Mcrypt implementation.");
-  }
-  else if ($aes_implementations['phpseclib']) {
-   variable_set("aes_implementation", "phpseclib");
-   $install_msg = t("AES installed using the phpseclib implementation.");
-  }
-  else {
-   //this case shouldn't actually be possible since hook_requirements should stop the installation if there's no implementation
-   variable_set("aes_implementation", "missing");
-   $install_msg = t("AES installed without any implementation!");
-  }
-  
-  drupal_set_message($install_msg);
+ include_once 'aes.module';
+ if (aes_load_phpsec() === TRUE) {
+  $install_msg = t("AES module operational: phpseclib found!");
+ }
+ else {
+  $install_msg = t("AES module not opeartional: phpseclib not found!");
+ }
+ drupal_set_message($install_msg);
 }
 
-function aes_update_6100(&$sandbox = NULL) {
-  $aes_implementations = aes_get_available_aes_implementations();
+/**
+ * Set AES implementation.
+ */
+function aes_update_6100(&$sandbox) {
+ // This update hook used to detect which implementation was best, but now it
+ // simply sets the implementation to 'mcrypt', which was the only option
+ // before the version this hook was introduced. This variable is only used
+ // when decrypting legacy data.
+ variable_set('aes_implementation', 'mcrypt');
   
-  if ($aes_implementations['mcrypt']) {
-   variable_set("aes_implementation", "mcrypt");
+ return array();
+}
+
+/**
+ * Generate new, crytographically random key.
+ */
+function aes_update_6101(&$sandbox) {
+ // Copy old key variables to legacy variables.
+ $variables = array(
+  'aes_key_storage_method',
+  'aes_key',
+  'aes_key_path',
+ );
+ foreach ($variables as $name) {
+  $value = variable_get($name, NULL);
+  if ($value !== NULL) {
+   variable_set($name . '_legacy', $value);
   }
-  else if ($aes_implementations['phpseclib']) {
-   variable_set("aes_implementation", "phpseclib");
+ }
+
+ // Move legacy file-based key to new location.
+ if (variable_get('aes_key_storage_method_legacy', 'Database') == 'File') {
+  $key_path = variable_get('aes_key_path_legacy', NULL);
+  if ($key_path) {
+   $new_key_path = $key_path . '-legacy';
+   if (rename($key_path, $new_key_path)) {
+    variable_set('aes_key_path_legacy', $new_key_path);
+   }
+   else {
+    // If we can't move the legacy file to a new location, then at the very
+    // least we need to make sure the current key doesn't point to the same
+    // file, so we delete the path and set the storage method to database.
+    variable_del('aes_key_path');
+    variable_set('aes_key_storage_method', 'Database');
+   }
   }
-  else {
-   variable_set("aes_implementation", "missing");
-  }
+ }
+
+ // Make a new key and re-encrypt password data.
+ include_once 'aes.module';
+ if (aes_store_key(aes_make_key())) {
+  $a = db_query("SELECT uid, pass FROM {aes_passwords} WHERE uid != 0");
   
-  return array();
+  $updates_num = 0;
+  while ($user = db_fetch_array($a)) {
+   // We simply need to aes_decrypt() and aes_encrypt() without passing in the
+   // key because it'll detect that this is old encrypted data, and use the
+   // legacy key.
+   $plain_pass = aes_decrypt($user['pass']);
+   $new_pass = aes_encrypt($plain_pass);
+   $updates_num++;
+   
+   db_query("UPDATE {aes_passwords} SET pass='%s' WHERE uid=%d", $new_pass, $user['uid']);
+  }
+
+  drupal_set_message(t("Updated the passwords of !updates_num users because of a change in key.", array('!updates_num' => $updates_num)));
+ }
+ else {
+  drupal_set_message(t("Unable to generate new key - you'll need to generate a new crytograhically random key yourself", "error"));
+ }
+
+ return array();
 }
 
 function aes_schema() {
